@@ -1,0 +1,26 @@
+{
+  "name": "ai-architecture-explorer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub repo -> static analysis -> dependency/call graph -> Architecture IR -> UML diagrams -> interactive board -> AI assistant.",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc -b --pretty",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "api": "npm run dev --workspace @archx/api",
+    "web": "npm run dev --workspace @archx/web",
+    "dev": "echo \"Run 'npm run api' and 'npm run web' in two terminals.\""
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
