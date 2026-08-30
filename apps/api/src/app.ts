@@ -45,6 +45,8 @@ export function createApp(
         "GET /api/projects/:id/ai/smells",
         "GET /api/projects/:id/ai/cycles",
         "POST /api/projects/:id/ai/ask",
+        "GET /api/projects/:id/nodes/:nodeId/:relation",
+        "GET /api/projects/:id/path",
       ],
     });
   });

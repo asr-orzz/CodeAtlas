@@ -1,13 +1,19 @@
 import type { ArchitectureGraph } from "@archx/core";
 import type { ArchitectureReport } from "@archx/architecture";
+import { interpretCommand, type CanvasAction } from "./agent.js";
 import { explainArchitecture, explainCycles } from "./explain.js";
 import type { AiProvider } from "./provider.js";
 import { detectSmells, type Smell } from "./smells.js";
+import type { NodeRef } from "./tools.js";
 
 export interface Answer {
   answer: string;
   /** Whether the answer came from an LLM provider or the deterministic engine. */
   source: "provider" | "deterministic";
+  /** Nodes referenced by the answer, when the query resolved to specific types. */
+  matches?: NodeRef[];
+  /** An optional instruction for the UI to drive the canvas. */
+  action?: CanvasAction;
 }
 
 /**
@@ -38,6 +44,18 @@ export class ArchitectureAssistant {
   async ask(question: string): Promise<Answer> {
     const q = question.trim();
     if (!q) return { answer: "Ask me about the architecture, cycles or smells.", source: "deterministic" };
+
+    // Graph/canvas commands are handled deterministically and take priority so
+    // the assistant can drive the canvas even when an LLM is configured.
+    const command = interpretCommand(q, this.ir);
+    if (command) {
+      return {
+        answer: command.answer,
+        source: "deterministic",
+        matches: command.matches,
+        action: command.action,
+      };
+    }
 
     if (this.provider) {
       try {

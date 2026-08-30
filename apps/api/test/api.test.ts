@@ -99,6 +99,28 @@ describe("API", () => {
     expect(res.status).toBe(400);
   });
 
+  it("answers a graph command with a canvas action", async () => {
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/ai/ask`)
+      .send({ question: "focus UserService" });
+    expect(res.status).toBe(200);
+    expect(res.body.action?.type).toBe("focusNode");
+  });
+
+  it("queries a node's dependencies", async () => {
+    const detail = await request(app).get(`/api/projects/${projectId}`);
+    const service = detail.body.ir.nodes.find(
+      (n: { name: string }) => n.name === "UserService",
+    );
+    expect(service).toBeTruthy();
+    const res = await request(app).get(
+      `/api/projects/${projectId}/nodes/${encodeURIComponent(service.id)}/dependencies`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.relation).toBe("dependencies");
+    expect(Array.isArray(res.body.nodes)).toBe(true);
+  });
+
   it("returns 404 for unknown projects", async () => {
     const res = await request(app).get("/api/projects/does-not-exist");
     expect(res.status).toBe(404);

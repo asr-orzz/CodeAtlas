@@ -1,4 +1,6 @@
 export { ArchitectureAssistant, type Answer } from "./assistant.js";
+export { GraphTools, type NodeRef, type PathResult } from "./tools.js";
+export { interpretCommand, type AgentResult, type CanvasAction } from "./agent.js";
 export { explainArchitecture, explainCycles } from "./explain.js";
 export {
   detectSmells,

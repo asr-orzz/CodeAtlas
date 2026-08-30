@@ -4,10 +4,10 @@ import { BoardView } from "./board/BoardView";
 import { AiPanel } from "./components/AiPanel";
 import { AnalyzeForm } from "./components/AnalyzeForm";
 import { DetailPanel } from "./components/DetailPanel";
-import { DiagramView } from "./components/DiagramView";
+import { DiagramView, type DiagramRequest } from "./components/DiagramView";
 import { ProjectList } from "./components/ProjectList";
 import { ReportPanel } from "./components/ReportPanel";
-import type { ProjectDetail, ProjectSummary } from "./types";
+import type { CanvasAction, ProjectDetail, ProjectSummary } from "./types";
 
 type Mode = "explore" | "board";
 
@@ -20,6 +20,26 @@ export function App() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("explore");
   const [showAi, setShowAi] = useState(true);
+  const [diagramRequest, setDiagramRequest] = useState<DiagramRequest | undefined>(undefined);
+
+  const handleCanvasAction = useCallback((action: CanvasAction) => {
+    switch (action.type) {
+      case "focusNode":
+      case "highlightNodes":
+        setSelectedNodeId("nodeId" in action ? action.nodeId : (action.nodeIds[0] ?? null));
+        break;
+      case "showDiagram":
+        setDiagramRequest((r) => ({ kind: action.kind, nonce: (r?.nonce ?? 0) + 1 }));
+        break;
+      case "generateSequence":
+        setDiagramRequest((r) => ({
+          kind: "sequence",
+          entryId: action.entryId,
+          nonce: (r?.nonce ?? 0) + 1,
+        }));
+        break;
+    }
+  }, []);
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -37,6 +57,7 @@ export function App() {
 
   useEffect(() => {
     setSelectedNodeId(null);
+    setDiagramRequest(undefined);
     if (!selectedId) {
       setDetail(null);
       return;
@@ -154,7 +175,11 @@ export function App() {
                 </div>
                 <div className="flex min-h-0 flex-1 gap-4">
                   <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-surface-border bg-surface">
-                    <DiagramView projectId={detail.id} onSelectNode={setSelectedNodeId} />
+                    <DiagramView
+                      projectId={detail.id}
+                      onSelectNode={setSelectedNodeId}
+                      request={diagramRequest}
+                    />
                     {selectedNodeId && (
                       <DetailPanel
                         ir={detail.ir}
@@ -164,7 +189,11 @@ export function App() {
                     )}
                   </div>
                   {showAi && (
-                    <AiPanel projectId={detail.id} onFocusNode={setSelectedNodeId} />
+                    <AiPanel
+                      projectId={detail.id}
+                      onFocusNode={setSelectedNodeId}
+                      onCanvasAction={handleCanvasAction}
+                    />
                   )}
                 </div>
               </div>

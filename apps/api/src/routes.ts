@@ -10,6 +10,7 @@ import {
 import {
   ArchitectureAssistant,
   createProviderFromEnv,
+  GraphTools,
   type AiProvider,
 } from "@archx/ai";
 import { runAnalysis } from "./analyze.js";
@@ -379,6 +380,51 @@ export function createRoutes(
       }
       const result = await assistantFor(record).ask(body.question);
       res.json(result);
+    }),
+  );
+
+  // --- Graph queries (the assistant's tool layer, exposed directly) ---
+
+  const RELATIONS = new Set(["dependencies", "dependents", "callers", "callees"]);
+
+  router.get(
+    "/projects/:id/nodes/:nodeId/:relation",
+    asyncHandler((req, res) => {
+      const record = requireProject(store, req.params.id);
+      const relation = req.params.relation ?? "";
+      if (!RELATIONS.has(relation)) {
+        throw new HttpError(400, `Unknown relation: ${relation}`);
+      }
+      const tools = new GraphTools(record.ir);
+      const nodeId = req.params.nodeId ?? "";
+      if (!tools.has(nodeId)) throw new HttpError(404, "Node not found.");
+      const transitive = req.query.transitive === "1" || req.query.transitive === "true";
+      const nodes =
+        relation === "dependencies"
+          ? tools.dependencies(nodeId, transitive)
+          : relation === "dependents"
+            ? tools.dependents(nodeId, transitive)
+            : relation === "callers"
+              ? tools.callers(nodeId)
+              : tools.callees(nodeId);
+      res.json({ nodeId, relation, transitive, nodes });
+    }),
+  );
+
+  router.get(
+    "/projects/:id/path",
+    asyncHandler((req, res) => {
+      const record = requireProject(store, req.params.id);
+      const from = typeof req.query.from === "string" ? req.query.from : "";
+      const to = typeof req.query.to === "string" ? req.query.to : "";
+      if (!from || !to) {
+        throw new HttpError(400, "Query must include 'from' and 'to' node ids.");
+      }
+      const tools = new GraphTools(record.ir);
+      if (!tools.has(from) || !tools.has(to)) {
+        throw new HttpError(404, "One or both nodes were not found.");
+      }
+      res.json(tools.path(from, to));
     }),
   );
 

@@ -148,9 +148,23 @@ export interface Smell {
   nodes: string[];
 }
 
+export interface NodeRef {
+  id: string;
+  name: string;
+  kind: string;
+}
+
+export type CanvasAction =
+  | { type: "focusNode"; nodeId: string }
+  | { type: "showDiagram"; kind: "class" | "component" | "dependency" | "call" }
+  | { type: "generateSequence"; entryId: string }
+  | { type: "highlightNodes"; nodeIds: string[] };
+
 export interface AiAnswer {
   answer: string;
   source: "provider" | "deterministic";
+  matches?: NodeRef[];
+  action?: CanvasAction;
 }
 
 export type GraphViewKind = "dependency" | "call";

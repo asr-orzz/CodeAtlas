@@ -4,9 +4,17 @@ import { DiagramCanvas } from "../canvas/DiagramCanvas";
 import { SequenceCanvas } from "../canvas/SequenceCanvas";
 import type { DiagramKind, DiagramModel } from "../types";
 
+export interface DiagramRequest {
+  kind: DiagramKind;
+  entryId?: string;
+  /** Bump to re-apply the same request. */
+  nonce: number;
+}
+
 interface Props {
   projectId: string;
   onSelectNode?: (id: string | null) => void;
+  request?: DiagramRequest;
 }
 
 const TABS: Array<{ kind: DiagramKind; label: string }> = [
@@ -17,18 +25,26 @@ const TABS: Array<{ kind: DiagramKind; label: string }> = [
   { kind: "call", label: "Call graph" },
 ];
 
-export function DiagramView({ projectId, onSelectNode }: Props) {
+export function DiagramView({ projectId, onSelectNode, request }: Props) {
   const [kind, setKind] = useState<DiagramKind>("class");
+  const [entryId, setEntryId] = useState<string | undefined>(undefined);
   const [model, setModel] = useState<DiagramModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Apply an external request (e.g. from the AI assistant) to drive the view.
+  useEffect(() => {
+    if (!request) return;
+    setKind(request.kind);
+    setEntryId(request.kind === "sequence" ? request.entryId : undefined);
+  }, [request]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
     api
-      .getDiagram(projectId, kind)
+      .getDiagram(projectId, kind, kind === "sequence" ? entryId : undefined)
       .then((m) => {
         if (!cancelled) setModel(m);
       })
@@ -41,7 +57,7 @@ export function DiagramView({ projectId, onSelectNode }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [projectId, kind]);
+  }, [projectId, kind, entryId]);
 
   return (
     <div className="flex h-full flex-col">
@@ -51,6 +67,7 @@ export function DiagramView({ projectId, onSelectNode }: Props) {
             key={tab.kind}
             onClick={() => {
               setKind(tab.kind);
+              setEntryId(undefined);
               onSelectNode?.(null);
             }}
             className={`rounded-md px-3 py-1 text-xs font-medium transition ${

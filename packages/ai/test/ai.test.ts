@@ -1,7 +1,13 @@
 import { emptyGraph, type ArchitectureGraph } from "@archx/core";
 import { computeArchitectureReport } from "@archx/architecture";
 import { describe, expect, it } from "vitest";
-import { ArchitectureAssistant, detectSmells, type AiProvider } from "@archx/ai";
+import {
+  ArchitectureAssistant,
+  detectSmells,
+  GraphTools,
+  interpretCommand,
+  type AiProvider,
+} from "@archx/ai";
 
 function node(id: string, name: string, filePath: string) {
   return { id, kind: "class" as const, name, filePath };
@@ -88,5 +94,51 @@ describe("ArchitectureAssistant", () => {
     const assistant = new ArchitectureAssistant(ir, computeArchitectureReport(ir), provider);
     const { source } = await assistant.ask("explain the architecture");
     expect(source).toBe("deterministic");
+  });
+
+  it("handles graph commands even when a provider is present", async () => {
+    const ir = layeredIR();
+    const provider: AiProvider = { name: "stub", complete: async () => "LLM" };
+    const assistant = new ArchitectureAssistant(ir, computeArchitectureReport(ir), provider);
+    const { action, source } = await assistant.ask("what does UserController depend on?");
+    expect(source).toBe("deterministic");
+    expect(action).toEqual({ type: "showDiagram", kind: "dependency" });
+  });
+});
+
+describe("GraphTools", () => {
+  it("resolves direct and transitive dependencies", () => {
+    const tools = new GraphTools(layeredIR());
+    expect(tools.dependencies("c").map((n) => n.name)).toContain("UserService");
+    const transitive = tools.dependencies("c", true).map((n) => n.name);
+    expect(transitive).toEqual(expect.arrayContaining(["UserService", "Database"]));
+  });
+
+  it("finds a shortest dependency path", () => {
+    const tools = new GraphTools(layeredIR());
+    const path = tools.path("s", "d");
+    expect(path.found).toBe(true);
+    expect(path.nodes.map((n) => n.name)).toEqual(["UserService", "UserRepository", "Database"]);
+  });
+
+  it("searches nodes by name", () => {
+    const tools = new GraphTools(layeredIR());
+    expect(tools.search("repo")[0]?.name).toBe("UserRepository");
+  });
+});
+
+describe("interpretCommand", () => {
+  it("turns 'trace X' into a sequence action", () => {
+    const result = interpretCommand("trace UserController", layeredIR());
+    expect(result?.action).toEqual({ type: "generateSequence", entryId: "c" });
+  });
+
+  it("turns 'focus X' into a focus action", () => {
+    const result = interpretCommand("focus UserService", layeredIR());
+    expect(result?.action).toEqual({ type: "focusNode", nodeId: "s" });
+  });
+
+  it("returns null for free-form questions", () => {
+    expect(interpretCommand("summarize everything nicely", layeredIR())).toBeNull();
   });
 });

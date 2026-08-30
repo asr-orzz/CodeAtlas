@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import type { AiAnswer, Smell } from "../types";
+import type { AiAnswer, CanvasAction, Smell } from "../types";
 
 interface Props {
   projectId: string;
   onFocusNode?: (id: string) => void;
+  onCanvasAction?: (action: CanvasAction) => void;
 }
 
 type Tab = "explain" | "smells" | "ask";
@@ -15,7 +16,7 @@ const SEVERITY_STYLE: Record<Smell["severity"], string> = {
   info: "border-sky-500/40 bg-sky-500/10 text-sky-200",
 };
 
-export function AiPanel({ projectId, onFocusNode }: Props) {
+export function AiPanel({ projectId, onFocusNode, onCanvasAction }: Props) {
   const [tab, setTab] = useState<Tab>("explain");
   const [explain, setExplain] = useState<string>("");
   const [smells, setSmells] = useState<Smell[] | null>(null);
@@ -52,7 +53,9 @@ export function AiPanel({ projectId, onFocusNode }: Props) {
     if (!question.trim()) return;
     setAsking(true);
     try {
-      setAnswer(await api.aiAsk(projectId, question));
+      const result = await api.aiAsk(projectId, question);
+      setAnswer(result);
+      if (result.action) onCanvasAction?.(result.action);
     } catch (err) {
       setAnswer({ answer: err instanceof Error ? err.message : String(err), source: "deterministic" });
     } finally {
@@ -113,8 +116,22 @@ export function AiPanel({ projectId, onFocusNode }: Props) {
               <div className="rounded-lg border border-surface-border bg-surface p-3">
                 <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">
                   {answer.source === "provider" ? "AI provider" : "Deterministic engine"}
+                  {answer.action && " · canvas updated"}
                 </div>
                 <MarkdownLite text={answer.answer} />
+                {answer.matches && answer.matches.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1 border-t border-surface-border pt-2">
+                    {answer.matches.slice(0, 12).map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => onFocusNode?.(m.id)}
+                        className="rounded border border-surface-border px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-surface-raised"
+                      >
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
