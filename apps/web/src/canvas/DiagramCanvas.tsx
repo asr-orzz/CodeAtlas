@@ -12,12 +12,17 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import type { DiagramModel } from "../types";
 import { ClassNode } from "./ClassNode";
+import { ComponentNode } from "./ComponentNode";
+import { EntityNode } from "./EntityNode";
 import { toReactFlowEdge } from "./edgeStyles";
 
 const nodeTypes = {
   class: ClassNode,
   interface: ClassNode,
   enum: ClassNode,
+  function: ClassNode,
+  component: ComponentNode,
+  entity: EntityNode,
 };
 
 function toNodes(model: DiagramModel): Node[] {

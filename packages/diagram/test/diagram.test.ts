@@ -8,6 +8,7 @@ import {
 import {
   generateClassDiagram,
   generateComponentDiagram,
+  generateGraphDiagram,
   generateSequenceDiagram,
 } from "@archx/diagram";
 
@@ -74,6 +75,23 @@ describe("generateComponentDiagram", () => {
     expect(diagram.nodes.length).toBeGreaterThan(0);
     expect(diagram.nodes.every((n) => n.type === "component")).toBe(true);
     expect(diagram.nodes.every((n) => Number.isFinite(n.x))).toBe(true);
+  });
+});
+
+describe("generateGraphDiagram", () => {
+  it("lays out the dependency view with entity nodes", () => {
+    const diagram = generateGraphDiagram(sampleIR(), "dependency");
+    expect(diagram.kind).toBe("dependency");
+    expect(diagram.nodes.every((n) => n.type === "entity")).toBe(true);
+    expect(diagram.edges.some((e) => e.type === "dependency")).toBe(true);
+    expect(diagram.edges.every((e) => e.type !== "calls")).toBe(true);
+  });
+
+  it("lays out the call view with call edges", () => {
+    const diagram = generateGraphDiagram(sampleIR(), "call");
+    expect(diagram.kind).toBe("call");
+    expect(diagram.edges.every((e) => e.type === "calls")).toBe(true);
+    expect(diagram.edges.map((e) => e.label)).toContain("findById");
   });
 });
 

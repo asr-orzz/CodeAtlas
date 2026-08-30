@@ -1,4 +1,10 @@
-import type { ArchitectureGraph, EdgeKind, IRNode } from "@archx/core";
+import {
+  CALL_EDGE_KINDS,
+  DEPENDENCY_EDGE_KINDS,
+  type ArchitectureGraph,
+  type EdgeKind,
+  type IRNode,
+} from "@archx/core";
 import { aggregateByRole } from "@archx/architecture";
 import { emptyDiagram, type DiagramEdge, type DiagramModel, type DiagramNode } from "./model.js";
 import { measureClassNode, runLayout } from "./layout.js";
@@ -93,4 +99,53 @@ export function generateComponentDiagram(ir: ArchitectureGraph): DiagramModel {
 
   const laid = runLayout({ nodes, edges }, { rankdir: "TB", ranksep: 90 });
   return { kind: "component", ...laid };
+}
+
+const ENTITY_HEIGHT = 42;
+const ENTITY_CHAR = 7.2;
+
+/**
+ * Generate a node-link diagram for a single relationship view (dependency or
+ * call graph). Only nodes participating in the view are shown, laid out with
+ * dagre. Nodes are compact "entity" boxes rather than full class cards.
+ */
+export function generateGraphDiagram(
+  ir: ArchitectureGraph,
+  view: "dependency" | "call",
+): DiagramModel {
+  const kinds = new Set<EdgeKind>(
+    view === "call" ? CALL_EDGE_KINDS : DEPENDENCY_EDGE_KINDS,
+  );
+  const viewEdges = ir.edges.filter((e) => kinds.has(e.kind));
+  if (viewEdges.length === 0) {
+    return emptyDiagram(view, [`No ${view} relationships were found.`]);
+  }
+
+  const touched = new Set<string>();
+  for (const e of viewEdges) {
+    touched.add(e.source);
+    touched.add(e.target);
+  }
+
+  const nodes: Array<Omit<DiagramNode, "x" | "y">> = ir.nodes
+    .filter((n) => touched.has(n.id))
+    .map((n) => ({
+      id: n.id,
+      label: n.name,
+      type: "entity",
+      width: Math.min(300, Math.max(120, Math.round(n.name.length * ENTITY_CHAR) + 28)),
+      height: ENTITY_HEIGHT,
+      data: { filePath: n.filePath, group: n.data?.group, meta: { kind: n.kind } },
+    }));
+
+  const edges: Array<Omit<DiagramEdge, "points">> = viewEdges.map((e) => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    type: e.kind,
+    label: e.label,
+  }));
+
+  const laid = runLayout({ nodes, edges }, { rankdir: "TB", ranksep: 70 });
+  return { kind: view, ...laid };
 }

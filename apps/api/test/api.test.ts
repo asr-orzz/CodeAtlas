@@ -60,6 +60,13 @@ describe("API", () => {
     expect(res.body.edges.every((e: { kind: string }) => e.kind !== "calls")).toBe(true);
   });
 
+  it("serves a laid-out dependency diagram", async () => {
+    const res = await request(app).get(`/api/projects/${projectId}/diagram/dependency`);
+    expect(res.status).toBe(200);
+    expect(res.body.kind).toBe("dependency");
+    expect(res.body.nodes.every((n: { type: string }) => n.type === "entity")).toBe(true);
+  });
+
   it("returns 404 for unknown projects", async () => {
     const res = await request(app).get("/api/projects/does-not-exist");
     expect(res.status).toBe(404);

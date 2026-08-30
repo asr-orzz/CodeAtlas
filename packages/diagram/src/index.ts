@@ -4,6 +4,7 @@ export type { LayoutInput, LayoutOptions, LayoutResult } from "./layout.js";
 export {
   generateClassDiagram,
   generateComponentDiagram,
+  generateGraphDiagram,
   CLASS_EDGE_KINDS,
 } from "./generators.js";
 export { generateSequenceDiagram } from "./sequence.js";

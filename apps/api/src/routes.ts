@@ -4,6 +4,7 @@ import { Router } from "express";
 import {
   generateClassDiagram,
   generateComponentDiagram,
+  generateGraphDiagram,
   generateSequenceDiagram,
 } from "@archx/diagram";
 import { runAnalysis } from "./analyze.js";
@@ -12,7 +13,13 @@ import { asyncHandler, HttpError } from "./http.js";
 import type { ProjectRecord, ProjectStore } from "./store.js";
 import { graphView, type GraphViewKind } from "./views.js";
 
-const DIAGRAM_KINDS = new Set(["class", "component", "sequence"]);
+const DIAGRAM_KINDS = new Set([
+  "class",
+  "component",
+  "sequence",
+  "dependency",
+  "call",
+]);
 const GRAPH_VIEWS = new Set<GraphViewKind>(["dependency", "call"]);
 
 export interface RouteDeps {
@@ -146,6 +153,8 @@ export function createRoutes(store: ProjectStore, deps: RouteDeps = {}): Router 
       if (kind === "class") return void res.json(generateClassDiagram(record.ir));
       if (kind === "component")
         return void res.json(generateComponentDiagram(record.ir));
+      if (kind === "dependency" || kind === "call")
+        return void res.json(generateGraphDiagram(record.ir, kind));
       const entryId =
         typeof req.query.entryId === "string" ? req.query.entryId : undefined;
       return void res.json(generateSequenceDiagram(record.ir, { entryId }));

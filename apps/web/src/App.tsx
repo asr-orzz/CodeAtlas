@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api/client";
 import { AnalyzeForm } from "./components/AnalyzeForm";
+import { DetailPanel } from "./components/DetailPanel";
 import { DiagramView } from "./components/DiagramView";
 import { ProjectList } from "./components/ProjectList";
 import { ReportPanel } from "./components/ReportPanel";
@@ -12,6 +13,7 @@ export function App() {
   const [detail, setDetail] = useState<ProjectDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -28,6 +30,7 @@ export function App() {
   }, [refreshProjects]);
 
   useEffect(() => {
+    setSelectedNodeId(null);
     if (!selectedId) {
       setDetail(null);
       return;
@@ -115,8 +118,15 @@ export function App() {
               <div className="shrink-0">
                 <ReportPanel project={detail} />
               </div>
-              <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-surface-border bg-surface">
-                <DiagramView projectId={detail.id} />
+              <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-surface-border bg-surface">
+                <DiagramView projectId={detail.id} onSelectNode={setSelectedNodeId} />
+                {selectedNodeId && (
+                  <DetailPanel
+                    ir={detail.ir}
+                    nodeId={selectedNodeId}
+                    onClose={() => setSelectedNodeId(null)}
+                  />
+                )}
               </div>
             </div>
           </>

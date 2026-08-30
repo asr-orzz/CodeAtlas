@@ -38,7 +38,12 @@ export interface ProjectDetail {
 
 // --- Diagram model (mirrors @archx/diagram so the frontend stays decoupled) ---
 
-export type DiagramKind = "class" | "component" | "sequence";
+export type DiagramKind =
+  | "class"
+  | "component"
+  | "sequence"
+  | "dependency"
+  | "call";
 
 export interface Point {
   x: number;

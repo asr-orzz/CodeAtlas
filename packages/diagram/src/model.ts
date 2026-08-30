@@ -1,9 +1,14 @@
 import type { EdgeKind, MethodInfo, NodeKind, PropertyInfo } from "@archx/core";
 
-export type DiagramKind = "class" | "component" | "sequence";
+export type DiagramKind =
+  | "class"
+  | "component"
+  | "sequence"
+  | "dependency"
+  | "call";
 
 /** The visual type of a diagram node. */
-export type DiagramNodeType = NodeKind | "lifeline";
+export type DiagramNodeType = NodeKind | "lifeline" | "entity";
 
 /** Edge kinds a diagram can render, plus the sequence-only "message". */
 export type DiagramEdgeType = EdgeKind | "message";
