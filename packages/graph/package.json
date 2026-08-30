@@ -1,0 +1,17 @@
+{
+  "name": "@archx/graph",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Directed graph engine + algorithms (cycles, topo sort, paths, components).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@archx/core": "*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}
