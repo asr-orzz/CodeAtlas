@@ -70,3 +70,32 @@ describe("API", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("GitHub import route", () => {
+  const ghApp = createApp(
+    new ProjectStore(mkdtempSync(path.join(tmpdir(), "archx-gh-route-"))),
+    {
+      cloner: () => ({
+        dir: fixtureDir,
+        commit: "deadbeef",
+        branch: "main",
+        cleanup: () => {},
+      }),
+    },
+  );
+
+  it("imports a repository via a stubbed clone", async () => {
+    const res = await request(ghApp)
+      .post("/api/analyze/github")
+      .send({ url: "octo/demo" });
+    expect(res.status).toBe(201);
+    expect(res.body.source).toBe("https://github.com/octo/demo");
+    expect(res.body.meta.commit).toBe("deadbeef");
+    expect(res.body.report.nodeCount).toBeGreaterThan(0);
+  });
+
+  it("rejects import without a url", async () => {
+    const res = await request(ghApp).post("/api/analyze/github").send({});
+    expect(res.status).toBe(400);
+  });
+});

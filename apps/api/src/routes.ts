@@ -7,15 +7,38 @@ import {
   generateSequenceDiagram,
 } from "@archx/diagram";
 import { runAnalysis } from "./analyze.js";
+import { gitClone, importFromGitHub, type Cloner } from "./github.js";
 import { asyncHandler, HttpError } from "./http.js";
-import type { ProjectStore } from "./store.js";
+import type { ProjectRecord, ProjectStore } from "./store.js";
 import { graphView, type GraphViewKind } from "./views.js";
 
 const DIAGRAM_KINDS = new Set(["class", "component", "sequence"]);
 const GRAPH_VIEWS = new Set<GraphViewKind>(["dependency", "call"]);
 
-export function createRoutes(store: ProjectStore): Router {
+export interface RouteDeps {
+  /** Injectable clone implementation (stubbed in tests). */
+  cloner?: Cloner;
+}
+
+function importResponse(record: ProjectRecord) {
+  return {
+    id: record.id,
+    name: record.name,
+    source: record.source,
+    createdAt: record.createdAt,
+    meta: {
+      owner: record.ir.meta.owner,
+      repository: record.ir.meta.repository,
+      branch: record.ir.meta.branch,
+      commit: record.ir.meta.commit,
+    },
+    report: record.report,
+  };
+}
+
+export function createRoutes(store: ProjectStore, deps: RouteDeps = {}): Router {
   const router = Router();
+  const cloner = deps.cloner ?? gitClone;
 
   router.get(
     "/health",
@@ -50,13 +73,32 @@ export function createRoutes(store: ProjectStore): Router {
 
       const { ir, report } = runAnalysis(resolved, { rootPath: resolved });
       const record = store.create({ name, source: resolved, ir, report });
-      res.status(201).json({
-        id: record.id,
-        name: record.name,
-        source: record.source,
-        createdAt: record.createdAt,
-        report: record.report,
-      });
+      res.status(201).json(importResponse(record));
+    }),
+  );
+
+  // Import and analyze a public GitHub repository.
+  router.post(
+    "/analyze/github",
+    asyncHandler((req, res) => {
+      const body = (req.body ?? {}) as {
+        url?: unknown;
+        branch?: unknown;
+        name?: unknown;
+      };
+      if (typeof body.url !== "string" || body.url.trim() === "") {
+        throw new HttpError(400, "Body must include a non-empty 'url' string.");
+      }
+      const record = importFromGitHub(
+        store,
+        {
+          url: body.url,
+          branch: typeof body.branch === "string" ? body.branch : undefined,
+          name: typeof body.name === "string" ? body.name : undefined,
+        },
+        cloner,
+      );
+      res.status(201).json(importResponse(record));
     }),
   );
 

@@ -7,11 +7,14 @@ import express, {
 } from "express";
 import { config } from "./config.js";
 import { HttpError } from "./http.js";
-import { createRoutes } from "./routes.js";
+import { createRoutes, type RouteDeps } from "./routes.js";
 import { ProjectStore } from "./store.js";
 
 /** Build the Express app (without starting the listener) for reuse in tests. */
-export function createApp(store: ProjectStore = new ProjectStore(config.dataDir)): Express {
+export function createApp(
+  store: ProjectStore = new ProjectStore(config.dataDir),
+  deps: RouteDeps = {},
+): Express {
   const app = express();
 
   app.use(
@@ -26,6 +29,7 @@ export function createApp(store: ProjectStore = new ProjectStore(config.dataDir)
       name: "AI Software Architecture Explorer API",
       endpoints: [
         "POST /api/analyze",
+        "POST /api/analyze/github",
         "GET /api/projects",
         "GET /api/projects/:id",
         "GET /api/projects/:id/diagram/:kind",
@@ -34,7 +38,7 @@ export function createApp(store: ProjectStore = new ProjectStore(config.dataDir)
     });
   });
 
-  app.use("/api", createRoutes(store));
+  app.use("/api", createRoutes(store, deps));
 
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: "Not found" });
