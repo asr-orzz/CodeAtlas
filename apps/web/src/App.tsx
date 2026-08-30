@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api/client";
 import { AnalyzeForm } from "./components/AnalyzeForm";
+import { DiagramView } from "./components/DiagramView";
 import { ProjectList } from "./components/ProjectList";
 import { ReportPanel } from "./components/ReportPanel";
 import type { ProjectDetail, ProjectSummary } from "./types";
@@ -110,10 +111,12 @@ export function App() {
                 <p className="truncate text-xs text-slate-500">{detail.source}</p>
               </div>
             </header>
-            <div className="min-h-0 flex-1 overflow-y-auto p-6">
-              <ReportPanel project={detail} />
-              <div className="mt-6 flex h-64 items-center justify-center rounded-xl border border-dashed border-surface-border text-sm text-slate-600">
-                Interactive diagram canvas arrives in the next step.
+            <div className="flex min-h-0 flex-1 flex-col gap-4 p-6">
+              <div className="shrink-0">
+                <ReportPanel project={detail} />
+              </div>
+              <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-surface-border bg-surface">
+                <DiagramView projectId={detail.id} />
               </div>
             </div>
           </>
