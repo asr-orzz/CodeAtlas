@@ -137,6 +137,22 @@ export interface BoardSummary {
   updatedAt: string;
 }
 
+// --- AI assistant ---
+
+export interface Smell {
+  id: string;
+  kind: "cycle" | "layering" | "god-object" | "isolated";
+  severity: "info" | "warning" | "error";
+  title: string;
+  detail: string;
+  nodes: string[];
+}
+
+export interface AiAnswer {
+  answer: string;
+  source: "provider" | "deterministic";
+}
+
 export type GraphViewKind = "dependency" | "call";
 
 export interface GraphView {

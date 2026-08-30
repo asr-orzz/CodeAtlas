@@ -41,6 +41,10 @@ export function createApp(
         "GET /api/boards/:boardId",
         "PUT /api/boards/:boardId",
         "DELETE /api/boards/:boardId",
+        "GET /api/projects/:id/ai/explain",
+        "GET /api/projects/:id/ai/smells",
+        "GET /api/projects/:id/ai/cycles",
+        "POST /api/projects/:id/ai/ask",
       ],
     });
   });

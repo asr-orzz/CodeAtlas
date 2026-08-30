@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api/client";
 import { BoardView } from "./board/BoardView";
+import { AiPanel } from "./components/AiPanel";
 import { AnalyzeForm } from "./components/AnalyzeForm";
 import { DetailPanel } from "./components/DetailPanel";
 import { DiagramView } from "./components/DiagramView";
@@ -18,6 +19,7 @@ export function App() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("explore");
+  const [showAi, setShowAi] = useState(true);
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -117,20 +119,32 @@ export function App() {
                 </h2>
                 <p className="truncate text-xs text-slate-500">{detail.source}</p>
               </div>
-              <div className="flex shrink-0 items-center gap-1 rounded-lg border border-surface-border bg-surface p-0.5">
-                {(["explore", "board"] as Mode[]).map((m) => (
+              <div className="flex shrink-0 items-center gap-2">
+                {mode === "explore" && (
                   <button
-                    key={m}
-                    onClick={() => setMode(m)}
-                    className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition ${
-                      mode === m
-                        ? "bg-accent text-white"
-                        : "text-slate-400 hover:text-slate-200"
+                    onClick={() => setShowAi((v) => !v)}
+                    className={`rounded-md border border-surface-border px-3 py-1 text-xs font-medium transition ${
+                      showAi ? "bg-accent/20 text-accent" : "text-slate-400 hover:text-slate-200"
                     }`}
                   >
-                    {m}
+                    AI assistant
                   </button>
-                ))}
+                )}
+                <div className="flex items-center gap-1 rounded-lg border border-surface-border bg-surface p-0.5">
+                  {(["explore", "board"] as Mode[]).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setMode(m)}
+                      className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition ${
+                        mode === m
+                          ? "bg-accent text-white"
+                          : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
               </div>
             </header>
             {mode === "explore" ? (
@@ -138,14 +152,19 @@ export function App() {
                 <div className="shrink-0">
                   <ReportPanel project={detail} />
                 </div>
-                <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-surface-border bg-surface">
-                  <DiagramView projectId={detail.id} onSelectNode={setSelectedNodeId} />
-                  {selectedNodeId && (
-                    <DetailPanel
-                      ir={detail.ir}
-                      nodeId={selectedNodeId}
-                      onClose={() => setSelectedNodeId(null)}
-                    />
+                <div className="flex min-h-0 flex-1 gap-4">
+                  <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-surface-border bg-surface">
+                    <DiagramView projectId={detail.id} onSelectNode={setSelectedNodeId} />
+                    {selectedNodeId && (
+                      <DetailPanel
+                        ir={detail.ir}
+                        nodeId={selectedNodeId}
+                        onClose={() => setSelectedNodeId(null)}
+                      />
+                    )}
+                  </div>
+                  {showAi && (
+                    <AiPanel projectId={detail.id} onFocusNode={setSelectedNodeId} />
                   )}
                 </div>
               </div>

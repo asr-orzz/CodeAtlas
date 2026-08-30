@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@archx/ai": "*",
     "@archx/analyzer": "*",
     "@archx/architecture": "*",
     "@archx/core": "*",

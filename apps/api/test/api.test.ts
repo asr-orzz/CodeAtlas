@@ -73,6 +73,32 @@ describe("API", () => {
     expect(res.body.nodes.every((n: { type: string }) => n.type === "entity")).toBe(true);
   });
 
+  it("explains the architecture via the AI assistant", async () => {
+    const res = await request(app).get(`/api/projects/${projectId}/ai/explain`);
+    expect(res.status).toBe(200);
+    expect(res.body.text).toContain("Architecture overview");
+  });
+
+  it("returns detected smells", async () => {
+    const res = await request(app).get(`/api/projects/${projectId}/ai/smells`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.smells)).toBe(true);
+  });
+
+  it("answers questions deterministically", async () => {
+    const res = await request(app)
+      .post(`/api/projects/${projectId}/ai/ask`)
+      .send({ question: "explain the architecture" });
+    expect(res.status).toBe(200);
+    expect(res.body.source).toBe("deterministic");
+    expect(typeof res.body.answer).toBe("string");
+  });
+
+  it("rejects an empty question", async () => {
+    const res = await request(app).post(`/api/projects/${projectId}/ai/ask`).send({});
+    expect(res.status).toBe(400);
+  });
+
   it("returns 404 for unknown projects", async () => {
     const res = await request(app).get("/api/projects/does-not-exist");
     expect(res.status).toBe(404);

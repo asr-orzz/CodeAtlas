@@ -7,6 +7,11 @@ import {
   generateGraphDiagram,
   generateSequenceDiagram,
 } from "@archx/diagram";
+import {
+  ArchitectureAssistant,
+  createProviderFromEnv,
+  type AiProvider,
+} from "@archx/ai";
 import { runAnalysis } from "./analyze.js";
 import {
   type Board,
@@ -33,6 +38,8 @@ const GRAPH_VIEWS = new Set<GraphViewKind>(["dependency", "call"]);
 export interface RouteDeps {
   /** Injectable clone implementation (stubbed in tests). */
   cloner?: Cloner;
+  /** Optional LLM provider; when absent the assistant is fully deterministic. */
+  aiProvider?: AiProvider;
 }
 
 function importResponse(record: ProjectRecord) {
@@ -145,6 +152,9 @@ export function createRoutes(
 ): Router {
   const router = Router();
   const cloner = deps.cloner ?? gitClone;
+  const aiProvider = deps.aiProvider ?? createProviderFromEnv(process.env);
+  const assistantFor = (record: ProjectRecord) =>
+    new ArchitectureAssistant(record.ir, record.report, aiProvider);
 
   router.get(
     "/health",
@@ -330,6 +340,45 @@ export function createRoutes(
         throw new HttpError(400, `Unknown graph view: ${view}`);
       }
       res.json(graphView(record.ir, view));
+    }),
+  );
+
+  // --- AI assistant (deterministic by default, pluggable LLM provider) ---
+
+  router.get(
+    "/projects/:id/ai/explain",
+    asyncHandler((req, res) => {
+      const record = requireProject(store, req.params.id);
+      res.json({ text: assistantFor(record).explain() });
+    }),
+  );
+
+  router.get(
+    "/projects/:id/ai/smells",
+    asyncHandler((req, res) => {
+      const record = requireProject(store, req.params.id);
+      res.json({ smells: assistantFor(record).smells() });
+    }),
+  );
+
+  router.get(
+    "/projects/:id/ai/cycles",
+    asyncHandler((req, res) => {
+      const record = requireProject(store, req.params.id);
+      res.json({ text: assistantFor(record).cycles() });
+    }),
+  );
+
+  router.post(
+    "/projects/:id/ai/ask",
+    asyncHandler(async (req, res) => {
+      const record = requireProject(store, req.params.id);
+      const body = (req.body ?? {}) as { question?: unknown };
+      if (typeof body.question !== "string" || body.question.trim() === "") {
+        throw new HttpError(400, "Body must include a non-empty 'question' string.");
+      }
+      const result = await assistantFor(record).ask(body.question);
+      res.json(result);
     }),
   );
 

@@ -1,4 +1,5 @@
 import type {
+  AiAnswer,
   Board,
   BoardSummary,
   DiagramKind,
@@ -8,6 +9,7 @@ import type {
   ImportResult,
   ProjectDetail,
   ProjectSummary,
+  Smell,
 } from "../types";
 
 const BASE_URL =
@@ -85,4 +87,16 @@ export const api = {
 
   deleteBoard: (boardId: string) =>
     http<void>(`/api/boards/${boardId}`, { method: "DELETE" }),
+
+  aiExplain: (projectId: string) =>
+    http<{ text: string }>(`/api/projects/${projectId}/ai/explain`),
+
+  aiSmells: (projectId: string) =>
+    http<{ smells: Smell[] }>(`/api/projects/${projectId}/ai/smells`),
+
+  aiAsk: (projectId: string, question: string) =>
+    http<AiAnswer>(`/api/projects/${projectId}/ai/ask`, {
+      method: "POST",
+      body: JSON.stringify({ question }),
+    }),
 };
