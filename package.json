@@ -1,8 +1,8 @@
 {
-  "name": "ai-architecture-explorer",
+  "name": "codeatlas",
   "version": "0.1.0",
   "private": true,
-  "description": "GitHub repo -> static analysis -> dependency/call graph -> Architecture IR -> UML diagrams -> interactive board -> AI assistant.",
+  "description": "CodeAtlas: GitHub repo -> static analysis -> dependency/call graph -> Architecture IR -> UML diagrams -> interactive board -> AI assistant.",
   "type": "module",
   "workspaces": [
     "packages/*",

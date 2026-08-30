@@ -95,7 +95,7 @@ export function App() {
       <aside className="flex w-80 shrink-0 flex-col border-r border-surface-border bg-surface-raised">
         <div className="border-b border-surface-border px-4 py-4">
           <h1 className="text-sm font-bold text-slate-100">
-            Architecture Explorer
+            CodeAtlas
           </h1>
           <p className="text-[11px] text-slate-500">
             code → graph → diagrams → AI

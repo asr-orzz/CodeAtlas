@@ -28,7 +28,7 @@ export function createApp(
 
   app.get("/", (_req: Request, res: Response) => {
     res.json({
-      name: "AI Software Architecture Explorer API",
+      name: "CodeAtlas API",
       endpoints: [
         "POST /api/analyze",
         "POST /api/analyze/github",

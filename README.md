@@ -1,4 +1,4 @@
-# AI Software Architecture Explorer
+# CodeAtlas
 
 Turn a codebase into a **fact-based architecture model**, then visualize, explore, edit and reason about it.
 
