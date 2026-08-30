@@ -1,0 +1,28 @@
+{
+  "name": "@archx/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Express API: analyze repositories and serve the IR, graphs and diagrams.",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@archx/analyzer": "*",
+    "@archx/architecture": "*",
+    "@archx/core": "*",
+    "@archx/diagram": "*",
+    "@archx/graph": "*",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/supertest": "^6.0.2",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.2"
+  }
+}
