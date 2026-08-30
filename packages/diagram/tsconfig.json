@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "composite": true,
+    "types": ["node", "dagre"]
+  },
+  "references": [
+    { "path": "../core" },
+    { "path": "../graph" },
+    { "path": "../architecture" }
+  ],
+  "include": ["src/**/*.ts"]
+}

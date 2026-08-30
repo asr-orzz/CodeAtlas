@@ -4,6 +4,7 @@
     { "path": "./packages/core" },
     { "path": "./packages/graph" },
     { "path": "./packages/analyzer" },
-    { "path": "./packages/architecture" }
+    { "path": "./packages/architecture" },
+    { "path": "./packages/diagram" }
   ]
 }

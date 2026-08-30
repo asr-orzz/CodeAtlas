@@ -1,0 +1,23 @@
+{
+  "name": "@archx/diagram",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Diagram engine: dagre layout + automatic class/component/sequence generation.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@archx/core": "*",
+    "@archx/graph": "*",
+    "@archx/architecture": "*",
+    "dagre": "^0.8.5"
+  },
+  "devDependencies": {
+    "@types/dagre": "^0.7.52"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}
