@@ -62,6 +62,11 @@ export function createApp(
       res.status(err.status).json({ error: err.message });
       return;
     }
+    // Malformed JSON bodies surface as a SyntaxError from body-parser.
+    if (err instanceof SyntaxError && "body" in (err as object)) {
+      res.status(400).json({ error: "Invalid JSON in request body." });
+      return;
+    }
     // eslint-disable-next-line no-console
     console.error("Unexpected error:", err);
     res.status(500).json({ error: "Internal server error" });

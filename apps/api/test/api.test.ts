@@ -121,6 +121,32 @@ describe("API", () => {
     expect(Array.isArray(res.body.nodes)).toBe(true);
   });
 
+  it("rejects an unknown node relation", async () => {
+    const res = await request(app).get(
+      `/api/projects/${projectId}/nodes/whatever/friends`,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("requires from and to for a path query", async () => {
+    const res = await request(app).get(`/api/projects/${projectId}/path`);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 on malformed JSON", async () => {
+    const res = await request(app)
+      .post("/api/analyze")
+      .set("Content-Type", "application/json")
+      .send("{ not valid json");
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 for unknown routes", async () => {
+    const res = await request(app).get("/api/nope");
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("Not found");
+  });
+
   it("returns 404 for unknown projects", async () => {
     const res = await request(app).get("/api/projects/does-not-exist");
     expect(res.status).toBe(404);

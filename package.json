@@ -14,10 +14,12 @@
     "test:watch": "vitest",
     "api": "npm run dev --workspace @archx/api",
     "web": "npm run dev --workspace @archx/web",
-    "dev": "echo \"Run 'npm run api' and 'npm run web' in two terminals.\""
+    "dev": "concurrently -n api,web -c blue,green \"npm:api\" \"npm:web\"",
+    "build": "npm run build --workspace @archx/web"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
+    "concurrently": "^9.1.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
   },
