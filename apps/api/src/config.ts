@@ -8,4 +8,11 @@ export const config = {
     : path.resolve(process.cwd(), "data"),
   /** Comma-separated allowed CORS origins, or "*" for any. */
   corsOrigin: process.env.ARCHX_CORS_ORIGIN ?? "*",
+  /**
+   * Optional directory of built web assets to serve (single-port production
+   * mode). When set, the API serves the SPA and routes non-/api requests to it.
+   */
+  webDir: process.env.ARCHX_WEB_DIR
+    ? path.resolve(process.env.ARCHX_WEB_DIR)
+    : undefined,
 };

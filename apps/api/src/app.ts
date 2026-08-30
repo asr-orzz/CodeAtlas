@@ -1,7 +1,10 @@
+import fs from "node:fs";
+import path from "node:path";
 import cors from "cors";
 import express, {
   type ErrorRequestHandler,
   type Express,
+  type NextFunction,
   type Request,
   type Response,
 } from "express";
@@ -26,7 +29,11 @@ export function createApp(
   );
   app.use(express.json({ limit: "4mb" }));
 
-  app.get("/", (_req: Request, res: Response) => {
+  const serveWeb = Boolean(config.webDir && fs.existsSync(config.webDir));
+
+  // In single-port production mode the built web app lives at "/", so the JSON
+  // API index moves to "/api". Otherwise it stays at "/".
+  const apiInfo = (_req: Request, res: Response) => {
     res.json({
       name: "CodeAtlas API",
       endpoints: [
@@ -49,9 +56,22 @@ export function createApp(
         "GET /api/projects/:id/path",
       ],
     });
-  });
+  };
+
+  if (!serveWeb) app.get("/", apiInfo);
 
   app.use("/api", createRoutes(store, boards, deps));
+
+  if (serveWeb && config.webDir) {
+    const webDir = config.webDir;
+    const indexHtml = path.join(webDir, "index.html");
+    app.use(express.static(webDir));
+    // SPA fallback: any non-/api GET that isn't a static asset returns index.html.
+    app.get(/^(?!\/api\/).*/, (req: Request, res: Response, next: NextFunction) => {
+      if (req.method !== "GET") return next();
+      res.sendFile(indexHtml);
+    });
+  }
 
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: "Not found" });

@@ -1,0 +1,33 @@
+node_modules
+**/node_modules
+dist
+**/dist
+build
+**/build
+*.tsbuildinfo
+
+# runtime data / cloned repos / saved boards
+data
+**/data
+.tmp
+.cache
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# vcs / editor / os
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# logs & misc
+*.log
+npm-debug.log*
+Dockerfile
+.dockerignore
+README.md

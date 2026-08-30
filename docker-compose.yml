@@ -1,0 +1,17 @@
+services:
+  codeatlas:
+    build: .
+    image: codeatlas
+    ports:
+      - "4000:4000"
+    environment:
+      # Uncomment and set to enable a real LLM provider (see packages/ai/src/provider.ts).
+      # OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ARCHX_CORS_ORIGIN: "*"
+    volumes:
+      # Persist analyzed projects and saved boards across restarts.
+      - codeatlas-data:/data
+    restart: unless-stopped
+
+volumes:
+  codeatlas-data:

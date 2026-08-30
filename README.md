@@ -95,6 +95,25 @@ npm run web          # terminal 2 — Vite dev server
 > Postgres/Redis, GitHub OAuth and PR bots from the extended vision are intentionally
 > out of scope for the first working version.
 
+## Run with Docker
+
+A single image builds the web app and serves it from the API on one port (4000):
+
+```bash
+# Using docker compose (recommended — persists data in a named volume)
+docker compose up --build
+# → open http://localhost:4000
+
+# Or with plain docker
+docker build -t codeatlas .
+docker run -p 4000:4000 -v codeatlas-data:/data codeatlas
+```
+
+The web app is served at `/` and the API under `/api` on the same origin, so no
+CORS or extra ports are needed. Analyzed projects and boards persist in the
+`/data` volume. `git` is included in the image for GitHub repo import (repos are
+only shallow-cloned and parsed, never executed).
+
 ## Configuration
 
 Copy the example env files and adjust as needed (all values have sane defaults):
@@ -109,7 +128,8 @@ cp apps/web/.env.example apps/web/.env
 | `ARCHX_PORT`        | api       | `4000`                  | API listen port                          |
 | `ARCHX_DATA_DIR`    | api       | `./data`                | Where projects & boards are persisted    |
 | `ARCHX_CORS_ORIGIN` | api       | `*`                     | Allowed CORS origins (comma-separated)   |
-| `VITE_API_URL`      | web       | `http://localhost:4000` | API base URL the frontend calls          |
+| `ARCHX_WEB_DIR`     | api       | (unset)                 | Serve a built web bundle from the API (single-port mode) |
+| `VITE_API_URL`      | web       | `http://localhost:4000` | API base URL the frontend calls (set to empty for same-origin) |
 
 The AI layer works offline with a deterministic engine. To plug in a real LLM,
 implement `createProviderFromEnv` in `packages/ai/src/provider.ts`.
