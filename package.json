@@ -17,6 +17,7 @@
     "dev": "echo \"Run 'npm run api' and 'npm run web' in two terminals.\""
   },
   "devDependencies": {
+    "@types/node": "^22.9.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
   },
