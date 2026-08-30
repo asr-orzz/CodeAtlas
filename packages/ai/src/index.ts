@@ -11,6 +11,8 @@ export {
 } from "./smells.js";
 export {
   createProviderFromEnv,
+  OpenAiCompatibleProvider,
   type AiProvider,
   type CompletionRequest,
+  type OpenAiCompatibleOptions,
 } from "./provider.js";

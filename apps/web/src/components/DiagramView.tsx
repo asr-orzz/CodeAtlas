@@ -31,6 +31,17 @@ export function DiagramView({ projectId, onSelectNode, request }: Props) {
   const [model, setModel] = useState<DiagramModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fullscreen, setFullscreen] = useState(false);
+
+  // Allow Esc to exit fullscreen.
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullscreen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullscreen]);
 
   // Apply an external request (e.g. from the AI assistant) to drive the view.
   useEffect(() => {
@@ -60,8 +71,14 @@ export function DiagramView({ projectId, onSelectNode, request }: Props) {
   }, [projectId, kind, entryId]);
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex shrink-0 gap-1 border-b border-surface-border bg-surface-raised px-2 py-1.5">
+    <div
+      className={
+        fullscreen
+          ? "fixed inset-0 z-50 flex flex-col bg-surface"
+          : "flex h-full flex-col"
+      }
+    >
+      <div className="flex shrink-0 items-center gap-1 border-b border-surface-border bg-surface-raised px-2 py-1.5">
         {TABS.map((tab) => (
           <button
             key={tab.kind}
@@ -79,6 +96,13 @@ export function DiagramView({ projectId, onSelectNode, request }: Props) {
             {tab.label}
           </button>
         ))}
+        <button
+          onClick={() => setFullscreen((v) => !v)}
+          className="ml-auto rounded-md border border-surface-border px-3 py-1 text-xs font-medium text-slate-300 hover:bg-surface hover:text-slate-100"
+          title={fullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
+        >
+          {fullscreen ? "✕ Exit fullscreen" : "⤢ Fullscreen"}
+        </button>
       </div>
 
       <div className="relative min-h-0 flex-1">
@@ -91,7 +115,11 @@ export function DiagramView({ projectId, onSelectNode, request }: Props) {
         ) : model.kind === "sequence" ? (
           <SequenceCanvas model={model} />
         ) : (
-          <DiagramCanvas model={model} onSelectNode={onSelectNode} />
+          <DiagramCanvas
+            key={`${kind}-${fullscreen}`}
+            model={model}
+            onSelectNode={onSelectNode}
+          />
         )}
       </div>
     </div>

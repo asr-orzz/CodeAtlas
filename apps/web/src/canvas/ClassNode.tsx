@@ -3,6 +3,9 @@ import type { DiagramNode } from "../types";
 
 type ClassNodeData = DiagramNode["data"] & { label: string; nodeType: string };
 
+const HANDLE_CLASS =
+  "!h-3 !w-3 !rounded-full !border-2 !border-surface-raised !bg-accent";
+
 const KIND_BADGE: Record<string, { text: string; className: string }> = {
   class: { text: "C", className: "bg-indigo-500/20 text-indigo-300" },
   interface: { text: "I", className: "bg-emerald-500/20 text-emerald-300" },
@@ -22,7 +25,8 @@ export function ClassNode({ data }: NodeProps<ClassNodeData>) {
 
   return (
     <div className="overflow-hidden rounded-lg border border-surface-border bg-surface-raised shadow-lg">
-      <Handle type="target" position={Position.Top} className="!h-1 !w-1 !border-0 !bg-transparent" />
+      <Handle type="target" position={Position.Top} className={HANDLE_CLASS} />
+      <Handle type="target" position={Position.Left} id="l" className={HANDLE_CLASS} />
 
       <div className="flex items-center gap-2 border-b border-surface-border bg-surface px-3 py-1.5">
         <span
@@ -56,11 +60,8 @@ export function ClassNode({ data }: NodeProps<ClassNodeData>) {
         </div>
       )}
 
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!h-1 !w-1 !border-0 !bg-transparent"
-      />
+      <Handle type="source" position={Position.Bottom} className={HANDLE_CLASS} />
+      <Handle type="source" position={Position.Right} id="r" className={HANDLE_CLASS} />
     </div>
   );
 }

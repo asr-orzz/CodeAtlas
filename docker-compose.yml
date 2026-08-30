@@ -5,9 +5,11 @@ services:
     ports:
       - "4000:4000"
     environment:
-      # Uncomment and set to enable a real LLM provider (see packages/ai/src/provider.ts).
-      # OPENAI_API_KEY: ${OPENAI_API_KEY}
       ARCHX_CORS_ORIGIN: "*"
+      # Enable the AI assistant with a free Grok model via OpenRouter.
+      # Put OPENROUTER_API_KEY in a local .env file (compose reads it automatically).
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-x-ai/grok-4-fast:free}
     volumes:
       # Persist analyzed projects and saved boards across restarts.
       - codeatlas-data:/data

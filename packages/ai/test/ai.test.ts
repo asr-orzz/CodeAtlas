@@ -3,6 +3,7 @@ import { computeArchitectureReport } from "@archx/architecture";
 import { describe, expect, it } from "vitest";
 import {
   ArchitectureAssistant,
+  createProviderFromEnv,
   detectSmells,
   GraphTools,
   interpretCommand,
@@ -124,6 +125,30 @@ describe("GraphTools", () => {
   it("searches nodes by name", () => {
     const tools = new GraphTools(layeredIR());
     expect(tools.search("repo")[0]?.name).toBe("UserRepository");
+  });
+});
+
+describe("createProviderFromEnv", () => {
+  it("returns undefined when no key is configured", () => {
+    expect(createProviderFromEnv({})).toBeUndefined();
+  });
+
+  it("defaults an OpenRouter key to a free Grok model", () => {
+    const provider = createProviderFromEnv({ OPENROUTER_API_KEY: "sk-or-test" });
+    expect(provider?.name).toBe("openrouter.ai:x-ai/grok-4-fast:free");
+  });
+
+  it("routes a bare xAI key to the xAI endpoint", () => {
+    const provider = createProviderFromEnv({ XAI_API_KEY: "xai-test" });
+    expect(provider?.name).toBe("api.x.ai:grok-4-fast");
+  });
+
+  it("honours explicit model and base URL overrides", () => {
+    const provider = createProviderFromEnv({
+      OPENROUTER_API_KEY: "sk-or-test",
+      AI_MODEL: "openrouter/free",
+    });
+    expect(provider?.name).toBe("openrouter.ai:openrouter/free");
   });
 });
 

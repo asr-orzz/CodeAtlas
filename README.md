@@ -70,9 +70,10 @@ database, message queue, or Docker required:
 - [`ts-morph`](https://ts-morph.com/) for AST parsing (pure JS, no native builds)
 - Hand-written graph algorithms
 - [`dagre`](https://github.com/dagrejs/dagre) for hierarchical layout
-- Express API, JSON-file storage
+- Express API with a persistent **SQLite** database ([`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3))
 - Vite + React + Tailwind CSS + React Flow for the interactive canvas
 - Pluggable AI layer with a **deterministic fallback**, so it works without an API key
+  (drop in a free **Grok** model via OpenRouter to enable the full LLM assistant)
 
 ## Getting started
 
@@ -126,13 +127,35 @@ cp apps/web/.env.example apps/web/.env
 | Variable            | Where     | Default                 | Purpose                                  |
 | ------------------- | --------- | ----------------------- | ---------------------------------------- |
 | `ARCHX_PORT`        | api       | `4000`                  | API listen port                          |
-| `ARCHX_DATA_DIR`    | api       | `./data`                | Where projects & boards are persisted    |
+| `ARCHX_DATA_DIR`    | api       | `./data`                | Folder holding the SQLite DB (`codeatlas.db`) |
 | `ARCHX_CORS_ORIGIN` | api       | `*`                     | Allowed CORS origins (comma-separated)   |
 | `ARCHX_WEB_DIR`     | api       | (unset)                 | Serve a built web bundle from the API (single-port mode) |
 | `VITE_API_URL`      | web       | `http://localhost:4000` | API base URL the frontend calls (set to empty for same-origin) |
 
-The AI layer works offline with a deterministic engine. To plug in a real LLM,
-implement `createProviderFromEnv` in `packages/ai/src/provider.ts`.
+### Enabling the AI assistant (free Grok model)
+
+The AI layer works offline with a deterministic engine. To turn on the full LLM
+assistant, add an API key to `apps/api/.env` — the easiest option is a **free
+Grok model via [OpenRouter](https://openrouter.ai/keys)**:
+
+```bash
+# apps/api/.env
+OPENROUTER_API_KEY=sk-or-...          # uses x-ai/grok-4-fast:free by default
+# AI_MODEL=x-ai/grok-4-fast:free      # optional override (e.g. openrouter/free)
+```
+
+Any OpenAI-compatible endpoint works. Alternatives:
+
+- **xAI directly:** set `XAI_API_KEY=...` (defaults to the `grok-4-fast` model).
+- **Custom gateway:** set `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL`.
+
+If no key is set, the assistant automatically falls back to the deterministic,
+fact-based engine — nothing breaks offline. Free models on OpenRouter can be
+rate-limited or rotated, so pick a paid model for heavy use.
+
+**Data & persistence:** projects and boards live in a real SQLite database at
+`$ARCHX_DATA_DIR/codeatlas.db`. Any pre-existing `data/projects/*.json` and
+`data/boards/*.json` from older runs are imported automatically on first start.
 
 ## API reference
 

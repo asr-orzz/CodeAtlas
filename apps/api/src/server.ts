@@ -1,3 +1,5 @@
+// Load .env before anything reads process.env (config, AI provider, …).
+import "dotenv/config";
 import { createApp } from "./app.js";
 import { config } from "./config.js";
 

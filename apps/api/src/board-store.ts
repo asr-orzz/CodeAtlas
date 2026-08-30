@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import type Database from "better-sqlite3";
+import { openDb } from "./db.js";
 
 export interface BoardNode {
   id: string;
@@ -47,55 +49,82 @@ export interface BoardSummary {
 
 export type BoardContent = Pick<Board, "nodes" | "edges"> & { name?: string };
 
-function summarize(board: Board): BoardSummary {
-  return {
-    id: board.id,
-    projectId: board.projectId,
-    name: board.name,
-    nodeCount: board.nodes.length,
-    edgeCount: board.edges.length,
-    updatedAt: board.updatedAt,
-  };
+interface BoardRow {
+  id: string;
+  projectId: string;
+  name: string;
+  nodes: string;
+  edges: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
- * JSON-file-backed store for manually edited boards. Mirrors ProjectStore:
- * everything is held in memory and persisted to disk so boards survive restarts.
+ * Persistent, SQLite-backed store for manually edited boards. Shares the same
+ * `codeatlas.db` file as ProjectStore. The public API is unchanged.
  */
 export class BoardStore {
-  private readonly boardsDir: string;
-  private readonly boards = new Map<string, Board>();
+  private readonly db: Database.Database;
 
   constructor(dataDir: string) {
-    this.boardsDir = path.join(dataDir, "boards");
-    fs.mkdirSync(this.boardsDir, { recursive: true });
-    this.loadFromDisk();
+    this.db = openDb(dataDir);
+    this.migrateLegacyJson(dataDir);
   }
 
-  private loadFromDisk(): void {
+  /** One-time import of pre-database `data/boards/*.json` files. */
+  private migrateLegacyJson(dataDir: string): void {
+    const legacyDir = path.join(dataDir, "boards");
+    if (!fs.existsSync(legacyDir)) return;
+    const count = this.db
+      .prepare("SELECT COUNT(*) AS n FROM boards")
+      .get() as { n: number };
+    if (count.n > 0) return;
+
     let files: string[] = [];
     try {
-      files = fs.readdirSync(this.boardsDir).filter((f) => f.endsWith(".json"));
+      files = fs.readdirSync(legacyDir).filter((f) => f.endsWith(".json"));
     } catch {
       return;
     }
     for (const file of files) {
       try {
-        const raw = fs.readFileSync(path.join(this.boardsDir, file), "utf8");
+        const raw = fs.readFileSync(path.join(legacyDir, file), "utf8");
         const board = JSON.parse(raw) as Board;
-        if (board.id) this.boards.set(board.id, board);
+        if (board.id) this.write(board);
       } catch {
-        // Skip corrupt files rather than crash the server.
+        // Skip corrupt legacy files rather than crash on startup.
       }
     }
   }
 
-  private persist(board: Board): void {
-    fs.writeFileSync(
-      path.join(this.boardsDir, `${board.id}.json`),
-      JSON.stringify(board),
-      "utf8",
-    );
+  private write(board: Board): void {
+    this.db
+      .prepare(
+        `INSERT OR REPLACE INTO boards
+           (id, projectId, name, nodes, edges, createdAt, updatedAt)
+         VALUES (@id, @projectId, @name, @nodes, @edges, @createdAt, @updatedAt)`,
+      )
+      .run({
+        id: board.id,
+        projectId: board.projectId,
+        name: board.name,
+        nodes: JSON.stringify(board.nodes),
+        edges: JSON.stringify(board.edges),
+        createdAt: board.createdAt,
+        updatedAt: board.updatedAt,
+      });
+  }
+
+  private fromRow(row: BoardRow): Board {
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      name: row.name,
+      nodes: JSON.parse(row.nodes) as BoardNode[],
+      edges: JSON.parse(row.edges) as BoardEdge[],
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
   }
 
   create(projectId: string, name: string, content?: BoardContent): Board {
@@ -109,24 +138,36 @@ export class BoardStore {
       createdAt: now,
       updatedAt: now,
     };
-    this.boards.set(board.id, board);
-    this.persist(board);
+    this.write(board);
     return board;
   }
 
   get(id: string): Board | undefined {
-    return this.boards.get(id);
+    const row = this.db
+      .prepare("SELECT * FROM boards WHERE id = ?")
+      .get(id) as BoardRow | undefined;
+    return row ? this.fromRow(row) : undefined;
   }
 
   listByProject(projectId: string): BoardSummary[] {
-    return [...this.boards.values()]
-      .filter((b) => b.projectId === projectId)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .map(summarize);
+    const rows = this.db
+      .prepare(
+        `SELECT id, projectId, name, nodes, edges, updatedAt
+         FROM boards WHERE projectId = ? ORDER BY updatedAt DESC`,
+      )
+      .all(projectId) as BoardRow[];
+    return rows.map((r) => ({
+      id: r.id,
+      projectId: r.projectId,
+      name: r.name,
+      nodeCount: (JSON.parse(r.nodes) as unknown[]).length,
+      edgeCount: (JSON.parse(r.edges) as unknown[]).length,
+      updatedAt: r.updatedAt,
+    }));
   }
 
   update(id: string, content: BoardContent): Board | undefined {
-    const board = this.boards.get(id);
+    const board = this.get(id);
     if (!board) return undefined;
     const updated: Board = {
       ...board,
@@ -135,26 +176,16 @@ export class BoardStore {
       edges: content.edges,
       updatedAt: new Date().toISOString(),
     };
-    this.boards.set(id, updated);
-    this.persist(updated);
+    this.write(updated);
     return updated;
   }
 
   delete(id: string): boolean {
-    const existed = this.boards.delete(id);
-    if (existed) {
-      try {
-        fs.rmSync(path.join(this.boardsDir, `${id}.json`));
-      } catch {
-        // ignore
-      }
-    }
-    return existed;
+    const info = this.db.prepare("DELETE FROM boards WHERE id = ?").run(id);
+    return info.changes > 0;
   }
 
   deleteByProject(projectId: string): void {
-    for (const board of [...this.boards.values()]) {
-      if (board.projectId === projectId) this.delete(board.id);
-    }
+    this.db.prepare("DELETE FROM boards WHERE projectId = ?").run(projectId);
   }
 }

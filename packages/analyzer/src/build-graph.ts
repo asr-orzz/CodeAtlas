@@ -220,9 +220,18 @@ export function buildArchitecture(
   }
 
   for (const i of analysis.interfaces) {
+    const structuralTargets = new Set<string>();
     for (const ext of i.extends) {
       const extId = resolveToken(i.filePath, ext);
-      if (extId) addEdge(i.id, extId, "inheritance");
+      if (extId) {
+        addEdge(i.id, extId, "inheritance");
+        structuralTargets.add(extId);
+      }
+    }
+    // Type-based dependencies from the interface's property and method types,
+    // e.g. `messages: ChatMessage[]` -> dependency on ChatMessage.
+    for (const dep of collectTypeDependencies(i, resolver)) {
+      if (!structuralTargets.has(dep)) addEdge(i.id, dep, "dependency");
     }
   }
 
@@ -250,20 +259,20 @@ function functionAsMethod(f: AnalyzedFunction): AnalyzedMethod {
   };
 }
 
-/** Type tokens referenced by a class's properties and method signatures. */
+/** Type tokens referenced by a class/interface's properties and method signatures. */
 function collectTypeDependencies(
-  cls: AnalyzedClass,
+  decl: AnalyzedClass | AnalyzedInterface,
   resolver: Resolver,
 ): Set<string> {
   const deps = new Set<string>();
   const addType = (typeText?: string): void => {
     for (const token of typeTokens(typeText)) {
-      const id = resolver.resolve(cls.filePath, token);
-      if (id && id !== cls.id) deps.add(id);
+      const id = resolver.resolve(decl.filePath, token);
+      if (id && id !== decl.id) deps.add(id);
     }
   };
-  for (const p of cls.properties) addType(p.type);
-  for (const m of cls.methods) {
+  for (const p of decl.properties) addType(p.type);
+  for (const m of decl.methods) {
     addType(m.returnType);
     for (const param of m.parameters) addType(param.type);
   }

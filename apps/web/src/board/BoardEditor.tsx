@@ -3,6 +3,7 @@ import ReactFlow, {
   addEdge,
   Background,
   BackgroundVariant,
+  ConnectionMode,
   Controls,
   MiniMap,
   useEdgesState,
@@ -260,6 +261,12 @@ export function BoardEditor({ board }: Props) {
         </div>
       </div>
 
+      <div className="shrink-0 border-b border-surface-border bg-surface px-3 py-1 text-[11px] text-slate-500">
+        Tip: drag from a node's blue dot onto another node to create a{" "}
+        <span className="font-medium text-slate-300">{edgeKind}</span> relationship. Select a
+        node or edge and press Delete (or the button) to remove it.
+      </div>
+
       <div className="relative min-h-0 flex-1">
         <ReactFlow
           nodes={nodes}
@@ -271,9 +278,11 @@ export function BoardEditor({ board }: Props) {
           onNodeClick={(_, node) => setSelected({ kind: "node", id: node.id })}
           onEdgeClick={(_, edge) => setSelected({ kind: "edge", id: edge.id })}
           onPaneClick={() => setSelected(null)}
+          connectionMode={ConnectionMode.Loose}
           fitView
-          fitViewOptions={{ padding: 0.2 }}
-          minZoom={0.1}
+          fitViewOptions={{ padding: 0.15, maxZoom: 1.5 }}
+          minZoom={0.05}
+          maxZoom={2.5}
           deleteKeyCode={["Backspace", "Delete"]}
           proOptions={{ hideAttribution: true }}
         >

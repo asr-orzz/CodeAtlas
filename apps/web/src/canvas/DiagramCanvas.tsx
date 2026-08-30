@@ -64,8 +64,10 @@ export function DiagramCanvas({ model, onSelectNode }: Props) {
       onNodeClick={(_, node) => onSelectNode?.(node.id)}
       onPaneClick={() => onSelectNode?.(null)}
       fitView
-      fitViewOptions={{ padding: 0.2 }}
-      minZoom={0.1}
+      fitViewOptions={{ padding: 0.12, maxZoom: 1.5 }}
+      minZoom={0.05}
+      maxZoom={2.5}
+      nodesConnectable={false}
       proOptions={{ hideAttribution: true }}
     >
       <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#242938" />

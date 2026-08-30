@@ -1,7 +1,11 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { ArchitectureGraph, EdgeKind } from "@archx/core";
-import { analyzeProject, buildArchitecture } from "@archx/analyzer";
+import {
+  analyzeProject,
+  buildArchitecture,
+  type SourceAnalysis,
+} from "@archx/analyzer";
 
 const fixtureRoot = fileURLToPath(new URL("./fixtures/sample", import.meta.url));
 
@@ -69,5 +73,68 @@ describe("buildArchitecture", () => {
     // UserRepository -> Repository is `implements`, so there must be no
     // separate `dependency` edge between the same pair.
     expect(hasEdge("UserRepository", "Repository", "dependency")).toBe(false);
+  });
+});
+
+describe("interface relationships", () => {
+  const loc = (line: number) => ({ file: "chat.ts", line, column: 1 });
+  const prop = (name: string, type: string) => ({
+    name,
+    type,
+    visibility: "public" as const,
+    isStatic: false,
+    isReadonly: false,
+  });
+
+  const analysis: SourceAnalysis = {
+    rootPath: "/proj",
+    files: [{ path: "chat.ts", language: "ts", imports: [] }],
+    classes: [],
+    interfaces: [
+      {
+        id: "chat.ts#ChatMessage",
+        name: "ChatMessage",
+        filePath: "chat.ts",
+        location: loc(1),
+        extends: [],
+        properties: [prop("id", "string"), prop("role", "string")],
+        methods: [],
+      },
+      {
+        id: "chat.ts#ChatState",
+        name: "ChatState",
+        filePath: "chat.ts",
+        location: loc(5),
+        extends: [],
+        // References ChatMessage in a property type and a method signature.
+        properties: [prop("messages", "ChatMessage[]")],
+        methods: [
+          {
+            name: "addMessage",
+            returnType: "void",
+            visibility: "public",
+            isStatic: false,
+            isAsync: false,
+            parameters: [{ name: "message", type: "ChatMessage" }],
+            location: loc(6),
+            references: [],
+          },
+        ],
+      },
+    ],
+    enums: [],
+    functions: [],
+    warnings: [],
+  };
+
+  it("creates dependency edges from interface property/method types", () => {
+    const g = buildArchitecture(analysis);
+    const edge = g.edges.find(
+      (e) =>
+        e.source === "chat.ts#ChatState" &&
+        e.target === "chat.ts#ChatMessage" &&
+        e.kind === "dependency",
+    );
+    expect(edge).toBeTruthy();
   });
 });

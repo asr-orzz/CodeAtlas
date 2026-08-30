@@ -14,6 +14,8 @@ import {
   type PropertyDeclaration,
   type PropertySignature,
   type SourceFile,
+  type TypeAliasDeclaration,
+  type TypeLiteralNode,
 } from "ts-morph";
 import type { SourceLocation, Visibility } from "@archx/core";
 import { collectSourceFiles, languageForFile } from "./collect-files.js";
@@ -119,6 +121,13 @@ export function analyzeProject(
     }
     for (const iface of sf.getInterfaces()) {
       analysis.interfaces.push(analyzeInterface(iface, rel, getLoc));
+    }
+    // Object/intersection `type` aliases behave like interfaces for UML: they
+    // describe a shape with named members. Capturing them makes diagrams of
+    // TypeScript/React codebases far richer (props, state, DTOs, …).
+    for (const ta of sf.getTypeAliases()) {
+      const analyzed = analyzeTypeAlias(ta, rel, getLoc);
+      if (analyzed) analysis.interfaces.push(analyzed);
     }
     for (const en of sf.getEnums()) {
       analysis.enums.push({
@@ -283,6 +292,73 @@ function analyzeInterface(
     filePath: rel,
     location: getLoc(iface),
     extends: iface.getExtends().map((e) => e.getExpression().getText()),
+    properties,
+    methods,
+  };
+}
+
+/**
+ * Turn an object-literal or intersection `type` alias into an interface-shaped
+ * record. Pure unions, primitives and function types are skipped (they have no
+ * member list to draw as a UML box). Intersection members that are type
+ * references become `extends` edges, so `type Admin = User & { … }` links to User.
+ */
+function analyzeTypeAlias(
+  ta: TypeAliasDeclaration,
+  rel: string,
+  getLoc: (node: Node) => SourceLocation,
+): AnalyzedInterface | undefined {
+  const typeNode = ta.getTypeNode();
+  if (!typeNode) return undefined;
+
+  const literals: TypeLiteralNode[] = [];
+  const extendsList: string[] = [];
+
+  const collect = (node: Node): void => {
+    if (Node.isTypeLiteral(node)) {
+      literals.push(node);
+    } else if (Node.isIntersectionTypeNode(node)) {
+      for (const part of node.getTypeNodes()) collect(part);
+    } else if (Node.isTypeReference(node)) {
+      extendsList.push(node.getTypeName().getText());
+    }
+  };
+  collect(typeNode);
+
+  if (literals.length === 0 && extendsList.length === 0) return undefined;
+
+  const properties: AnalyzedProperty[] = [];
+  const methods: AnalyzedMethod[] = [];
+  for (const lit of literals) {
+    for (const prop of lit.getProperties()) {
+      properties.push({
+        name: prop.getName(),
+        type: prop.getTypeNode()?.getText(),
+        visibility: "public" as Visibility,
+        isStatic: false,
+        isReadonly: prop.isReadonly(),
+      });
+    }
+    for (const m of lit.getMethods()) {
+      methods.push({
+        name: m.getName(),
+        returnType: m.getReturnTypeNode()?.getText(),
+        visibility: "public" as Visibility,
+        isStatic: false,
+        isAsync: false,
+        parameters: analyzeParameters(m.getParameters()),
+        location: getLoc(m),
+        references: [],
+      });
+    }
+  }
+
+  return {
+    id: declarationId(rel, ta.getName()),
+    name: ta.getName(),
+    filePath: rel,
+    location: getLoc(ta),
+    extends: extendsList,
     properties,
     methods,
   };
