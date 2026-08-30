@@ -17,18 +17,6 @@ import type {
   SymbolReference,
 } from "./types.js";
 
-/** Edge kinds that make up the "who depends on whom" dependency graph. */
-export const DEPENDENCY_EDGE_KINDS: EdgeKind[] = [
-  "dependency",
-  "uses",
-  "creates",
-  "inheritance",
-  "implements",
-];
-
-/** Edge kinds that make up the "who calls whom" call graph. */
-export const CALL_EDGE_KINDS: EdgeKind[] = ["calls"];
-
 const TOKEN_RE = /[A-Za-z_$][\w$]*/g;
 
 /** Extract identifier tokens from a type annotation, e.g. "Promise<User>" -> [Promise, User]. */

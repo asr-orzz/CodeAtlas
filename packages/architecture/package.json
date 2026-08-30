@@ -1,0 +1,18 @@
+{
+  "name": "@archx/architecture",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Higher-level architecture: role classification, component aggregation and metrics.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@archx/core": "*",
+    "@archx/graph": "*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}
