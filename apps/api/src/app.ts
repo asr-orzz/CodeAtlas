@@ -5,6 +5,7 @@ import express, {
   type Request,
   type Response,
 } from "express";
+import { BoardStore } from "./board-store.js";
 import { config } from "./config.js";
 import { HttpError } from "./http.js";
 import { createRoutes, type RouteDeps } from "./routes.js";
@@ -13,6 +14,7 @@ import { ProjectStore } from "./store.js";
 /** Build the Express app (without starting the listener) for reuse in tests. */
 export function createApp(
   store: ProjectStore = new ProjectStore(config.dataDir),
+  boards: BoardStore = new BoardStore(config.dataDir),
   deps: RouteDeps = {},
 ): Express {
   const app = express();
@@ -34,11 +36,16 @@ export function createApp(
         "GET /api/projects/:id",
         "GET /api/projects/:id/diagram/:kind",
         "GET /api/projects/:id/graph/:view",
+        "GET /api/projects/:id/boards",
+        "POST /api/projects/:id/boards",
+        "GET /api/boards/:boardId",
+        "PUT /api/boards/:boardId",
+        "DELETE /api/boards/:boardId",
       ],
     });
   });
 
-  app.use("/api", createRoutes(store, deps));
+  app.use("/api", createRoutes(store, boards, deps));
 
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: "Not found" });

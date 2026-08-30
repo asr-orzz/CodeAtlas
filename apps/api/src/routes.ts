@@ -8,10 +8,18 @@ import {
   generateSequenceDiagram,
 } from "@archx/diagram";
 import { runAnalysis } from "./analyze.js";
+import {
+  type Board,
+  type BoardContent,
+  type BoardEdge,
+  type BoardNode,
+  type BoardStore,
+} from "./board-store.js";
 import { gitClone, importFromGitHub, type Cloner } from "./github.js";
 import { asyncHandler, HttpError } from "./http.js";
 import type { ProjectRecord, ProjectStore } from "./store.js";
 import { graphView, type GraphViewKind } from "./views.js";
+import type { DiagramModel } from "@archx/diagram";
 
 const DIAGRAM_KINDS = new Set([
   "class",
@@ -43,7 +51,98 @@ function importResponse(record: ProjectRecord) {
   };
 }
 
-export function createRoutes(store: ProjectStore, deps: RouteDeps = {}): Router {
+const SEED_KINDS = new Set(["class", "component", "dependency", "call"]);
+
+/** Flatten a laid-out diagram into editable board content. */
+function diagramToBoard(model: DiagramModel): BoardContent {
+  return {
+    nodes: model.nodes.map((n) => ({
+      id: n.id,
+      type: n.type,
+      label: n.label,
+      x: n.x,
+      y: n.y,
+      width: n.width,
+      height: n.height,
+      data: n.data,
+    })),
+    edges: model.edges.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      type: e.type,
+      label: e.label,
+    })),
+  };
+}
+
+function seedContent(record: ProjectRecord, kind: string): BoardContent {
+  if (kind === "class") return diagramToBoard(generateClassDiagram(record.ir));
+  if (kind === "component")
+    return diagramToBoard(generateComponentDiagram(record.ir));
+  return diagramToBoard(generateGraphDiagram(record.ir, kind as "dependency" | "call"));
+}
+
+/** Validate and normalize a board payload coming from the client. */
+function parseBoardContent(body: unknown): BoardContent {
+  const obj = (body ?? {}) as {
+    name?: unknown;
+    nodes?: unknown;
+    edges?: unknown;
+  };
+  if (!Array.isArray(obj.nodes) || !Array.isArray(obj.edges)) {
+    throw new HttpError(400, "Board must include 'nodes' and 'edges' arrays.");
+  }
+  const nodes: BoardNode[] = obj.nodes.map((raw, i) => {
+    const n = raw as Partial<BoardNode>;
+    if (typeof n.id !== "string" || typeof n.type !== "string") {
+      throw new HttpError(400, `Node ${i} is missing 'id' or 'type'.`);
+    }
+    return {
+      id: n.id,
+      type: n.type,
+      label: typeof n.label === "string" ? n.label : n.id,
+      x: Number(n.x) || 0,
+      y: Number(n.y) || 0,
+      width: Number(n.width) || 160,
+      height: Number(n.height) || 60,
+      data: (n.data as BoardNode["data"]) ?? undefined,
+    };
+  });
+  const nodeIds = new Set(nodes.map((n) => n.id));
+  const edges: BoardEdge[] = obj.edges
+    .map((raw, i) => {
+      const e = raw as Partial<BoardEdge>;
+      if (typeof e.id !== "string" || typeof e.source !== "string" || typeof e.target !== "string") {
+        throw new HttpError(400, `Edge ${i} is missing 'id', 'source' or 'target'.`);
+      }
+      return {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: typeof e.type === "string" ? e.type : "association",
+        label: typeof e.label === "string" ? e.label : undefined,
+      };
+    })
+    // Drop dangling edges so a board never references removed nodes.
+    .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
+
+  return {
+    nodes,
+    edges,
+    name: typeof obj.name === "string" ? obj.name : undefined,
+  };
+}
+
+function boardResponse(board: Board) {
+  return board;
+}
+
+export function createRoutes(
+  store: ProjectStore,
+  boards: BoardStore,
+  deps: RouteDeps = {},
+): Router {
   const router = Router();
   const cloner = deps.cloner ?? gitClone;
 
@@ -137,6 +236,67 @@ export function createRoutes(store: ProjectStore, deps: RouteDeps = {}): Router 
       const id = req.params.id ?? "";
       if (!store.delete(id)) {
         throw new HttpError(404, "Project not found.");
+      }
+      boards.deleteByProject(id);
+      res.status(204).end();
+    }),
+  );
+
+  // --- Boards: manually edited architecture diagrams ---
+
+  router.get(
+    "/projects/:id/boards",
+    asyncHandler((req, res) => {
+      const record = requireProject(store, req.params.id);
+      res.json({ boards: boards.listByProject(record.id) });
+    }),
+  );
+
+  router.post(
+    "/projects/:id/boards",
+    asyncHandler((req, res) => {
+      const record = requireProject(store, req.params.id);
+      const body = (req.body ?? {}) as { name?: unknown; seedKind?: unknown };
+      const name =
+        typeof body.name === "string" && body.name.trim()
+          ? body.name.trim()
+          : "Untitled board";
+      let content: BoardContent | undefined;
+      if (typeof body.seedKind === "string") {
+        if (!SEED_KINDS.has(body.seedKind)) {
+          throw new HttpError(400, `Cannot seed a board from: ${body.seedKind}`);
+        }
+        content = seedContent(record, body.seedKind);
+      }
+      const board = boards.create(record.id, name, content);
+      res.status(201).json(boardResponse(board));
+    }),
+  );
+
+  router.get(
+    "/boards/:boardId",
+    asyncHandler((req, res) => {
+      const board = boards.get(req.params.boardId ?? "");
+      if (!board) throw new HttpError(404, "Board not found.");
+      res.json(boardResponse(board));
+    }),
+  );
+
+  router.put(
+    "/boards/:boardId",
+    asyncHandler((req, res) => {
+      const content = parseBoardContent(req.body);
+      const board = boards.update(req.params.boardId ?? "", content);
+      if (!board) throw new HttpError(404, "Board not found.");
+      res.json(boardResponse(board));
+    }),
+  );
+
+  router.delete(
+    "/boards/:boardId",
+    asyncHandler((req, res) => {
+      if (!boards.delete(req.params.boardId ?? "")) {
+        throw new HttpError(404, "Board not found.");
       }
       res.status(204).end();
     }),

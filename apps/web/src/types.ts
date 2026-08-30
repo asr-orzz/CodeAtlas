@@ -92,6 +92,51 @@ export interface DiagramModel {
   notes?: string[];
 }
 
+// --- Boards (manually edited diagrams) ---
+
+export interface BoardNode {
+  id: string;
+  type: string;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  data?: {
+    properties?: Array<{ name: string; type?: string; visibility?: string }>;
+    methods?: Array<{ name: string; returnType?: string; visibility?: string }>;
+    group?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface BoardEdge {
+  id: string;
+  source: string;
+  target: string;
+  type: string;
+  label?: string;
+}
+
+export interface Board {
+  id: string;
+  projectId: string;
+  name: string;
+  nodes: BoardNode[];
+  edges: BoardEdge[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BoardSummary {
+  id: string;
+  projectId: string;
+  name: string;
+  nodeCount: number;
+  edgeCount: number;
+  updatedAt: string;
+}
+
 export type GraphViewKind = "dependency" | "call";
 
 export interface GraphView {

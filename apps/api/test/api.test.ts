@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import request from "supertest";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
+import { BoardStore } from "../src/board-store.js";
 import { ProjectStore } from "../src/store.js";
 
 // The analyzer fixture doubles as a small realistic project to analyze.
@@ -12,7 +13,12 @@ const fixtureDir = fileURLToPath(
   new URL("../../../packages/analyzer/test/fixtures/sample", import.meta.url),
 );
 
-const app = createApp(new ProjectStore(mkdtempSync(path.join(tmpdir(), "archx-"))));
+function freshApp(prefix = "archx-") {
+  const dir = mkdtempSync(path.join(tmpdir(), prefix));
+  return createApp(new ProjectStore(dir), new BoardStore(dir));
+}
+
+const app = freshApp();
 
 describe("API", () => {
   let projectId = "";
@@ -78,18 +84,76 @@ describe("API", () => {
   });
 });
 
+describe("Boards", () => {
+  const boardApp = freshApp("archx-boards-");
+  let projectId = "";
+
+  beforeAll(async () => {
+    const res = await request(boardApp).post("/api/analyze").send({ path: fixtureDir });
+    projectId = res.body.id;
+  });
+
+  it("creates a board seeded from the class diagram", async () => {
+    const res = await request(boardApp)
+      .post(`/api/projects/${projectId}/boards`)
+      .send({ name: "My board", seedKind: "class" });
+    expect(res.status).toBe(201);
+    expect(res.body.name).toBe("My board");
+    expect(res.body.nodes.length).toBeGreaterThan(0);
+  });
+
+  it("saves and reloads edits, dropping dangling edges", async () => {
+    const created = await request(boardApp)
+      .post(`/api/projects/${projectId}/boards`)
+      .send({ name: "Editable" });
+    const boardId = created.body.id;
+
+    const save = await request(boardApp)
+      .put(`/api/boards/${boardId}`)
+      .send({
+        name: "Renamed",
+        nodes: [
+          { id: "a", type: "class", label: "A", x: 0, y: 0, width: 160, height: 60 },
+          { id: "b", type: "service", label: "B", x: 200, y: 0, width: 160, height: 60 },
+        ],
+        edges: [
+          { id: "e1", source: "a", target: "b", type: "association" },
+          { id: "e2", source: "a", target: "ghost", type: "calls" },
+        ],
+      });
+    expect(save.status).toBe(200);
+    expect(save.body.name).toBe("Renamed");
+    expect(save.body.edges.length).toBe(1); // dangling e2 dropped
+
+    const reload = await request(boardApp).get(`/api/boards/${boardId}`);
+    expect(reload.body.nodes.length).toBe(2);
+  });
+
+  it("lists boards and deletes them", async () => {
+    const list = await request(boardApp).get(`/api/projects/${projectId}/boards`);
+    expect(list.status).toBe(200);
+    expect(list.body.boards.length).toBeGreaterThanOrEqual(2);
+
+    const del = await request(boardApp).delete(`/api/boards/${list.body.boards[0].id}`);
+    expect(del.status).toBe(204);
+  });
+
+  it("returns 404 for a missing board", async () => {
+    const res = await request(boardApp).get("/api/boards/nope");
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("GitHub import route", () => {
-  const ghApp = createApp(
-    new ProjectStore(mkdtempSync(path.join(tmpdir(), "archx-gh-route-"))),
-    {
-      cloner: () => ({
-        dir: fixtureDir,
-        commit: "deadbeef",
-        branch: "main",
-        cleanup: () => {},
-      }),
-    },
-  );
+  const dir = mkdtempSync(path.join(tmpdir(), "archx-gh-route-"));
+  const ghApp = createApp(new ProjectStore(dir), new BoardStore(dir), {
+    cloner: () => ({
+      dir: fixtureDir,
+      commit: "deadbeef",
+      branch: "main",
+      cleanup: () => {},
+    }),
+  });
 
   it("imports a repository via a stubbed clone", async () => {
     const res = await request(ghApp)

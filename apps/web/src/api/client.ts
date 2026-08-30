@@ -1,4 +1,6 @@
 import type {
+  Board,
+  BoardSummary,
   DiagramKind,
   DiagramModel,
   GraphView,
@@ -60,4 +62,27 @@ export const api = {
 
   deleteProject: (id: string) =>
     http<void>(`/api/projects/${id}`, { method: "DELETE" }),
+
+  listBoards: (projectId: string) =>
+    http<{ boards: BoardSummary[] }>(`/api/projects/${projectId}/boards`),
+
+  createBoard: (projectId: string, name?: string, seedKind?: DiagramKind) =>
+    http<Board>(`/api/projects/${projectId}/boards`, {
+      method: "POST",
+      body: JSON.stringify({ name, seedKind }),
+    }),
+
+  getBoard: (boardId: string) => http<Board>(`/api/boards/${boardId}`),
+
+  saveBoard: (
+    boardId: string,
+    content: { name?: string; nodes: Board["nodes"]; edges: Board["edges"] },
+  ) =>
+    http<Board>(`/api/boards/${boardId}`, {
+      method: "PUT",
+      body: JSON.stringify(content),
+    }),
+
+  deleteBoard: (boardId: string) =>
+    http<void>(`/api/boards/${boardId}`, { method: "DELETE" }),
 };

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api/client";
+import { BoardView } from "./board/BoardView";
 import { AnalyzeForm } from "./components/AnalyzeForm";
 import { DetailPanel } from "./components/DetailPanel";
 import { DiagramView } from "./components/DiagramView";
 import { ProjectList } from "./components/ProjectList";
 import { ReportPanel } from "./components/ReportPanel";
 import type { ProjectDetail, ProjectSummary } from "./types";
+
+type Mode = "explore" | "board";
 
 export function App() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -14,6 +17,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>("explore");
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -113,22 +117,43 @@ export function App() {
                 </h2>
                 <p className="truncate text-xs text-slate-500">{detail.source}</p>
               </div>
+              <div className="flex shrink-0 items-center gap-1 rounded-lg border border-surface-border bg-surface p-0.5">
+                {(["explore", "board"] as Mode[]).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMode(m)}
+                    className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition ${
+                      mode === m
+                        ? "bg-accent text-white"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
             </header>
-            <div className="flex min-h-0 flex-1 flex-col gap-4 p-6">
-              <div className="shrink-0">
-                <ReportPanel project={detail} />
+            {mode === "explore" ? (
+              <div className="flex min-h-0 flex-1 flex-col gap-4 p-6">
+                <div className="shrink-0">
+                  <ReportPanel project={detail} />
+                </div>
+                <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-surface-border bg-surface">
+                  <DiagramView projectId={detail.id} onSelectNode={setSelectedNodeId} />
+                  {selectedNodeId && (
+                    <DetailPanel
+                      ir={detail.ir}
+                      nodeId={selectedNodeId}
+                      onClose={() => setSelectedNodeId(null)}
+                    />
+                  )}
+                </div>
               </div>
-              <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-surface-border bg-surface">
-                <DiagramView projectId={detail.id} onSelectNode={setSelectedNodeId} />
-                {selectedNodeId && (
-                  <DetailPanel
-                    ir={detail.ir}
-                    nodeId={selectedNodeId}
-                    onClose={() => setSelectedNodeId(null)}
-                  />
-                )}
+            ) : (
+              <div className="min-h-0 flex-1">
+                <BoardView projectId={detail.id} />
               </div>
-            </div>
+            )}
           </>
         )}
       </main>
