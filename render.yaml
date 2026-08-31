@@ -1,0 +1,33 @@
+# Render blueprint for the CodeAtlas API (backend).
+# Deploy: Render Dashboard → New → Blueprint → pick this repo.
+# The frontend is deployed separately on Vercel (see vercel.json).
+services:
+  - type: web
+    name: codeatlas-api
+    runtime: node
+    plan: free
+    # Repo root is the build context so npm workspaces link @archx/* packages.
+    # --include=dev is REQUIRED: the API runs via `tsx` (a devDependency) and
+    # Render sets NODE_ENV=production, which would otherwise skip it.
+    buildCommand: npm ci --include=dev
+    startCommand: npm run start --workspace @archx/api
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # Neon (or any) Postgres connection string — set this in the dashboard.
+      - key: DATABASE_URL
+        sync: false
+      # Auto-generated strong secret for signing login tokens.
+      - key: JWT_SECRET
+        generateValue: true
+      # Set to your Vercel domain (comma-separated) or "*" to allow any origin.
+      - key: ARCHX_CORS_ORIGIN
+        sync: false
+      # Optional: free Grok assistant via OpenRouter (leave unset for the
+      # deterministic engine).
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: AI_MODEL
+        value: x-ai/grok-4-fast:free
