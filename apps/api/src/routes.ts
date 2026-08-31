@@ -162,6 +162,12 @@ export function createRoutes(
   const router = Router();
   const cloner = deps.cloner ?? gitClone;
   const aiProvider = deps.aiProvider ?? createProviderFromEnv(process.env);
+  // eslint-disable-next-line no-console
+  console.log(
+    aiProvider
+      ? `[codeatlas] AI provider active → ${aiProvider.name}`
+      : "[codeatlas] No AI key found (OPENROUTER_API_KEY/XAI_API_KEY) — using the deterministic engine.",
+  );
   const assistantFor = (record: ProjectRecord) =>
     new ArchitectureAssistant(record.ir, record.report, aiProvider);
 

@@ -64,4 +64,13 @@ export async function initSchema(db: Pool = getPool()): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_boards_project ON boards(project_id);
   `);
+
+  // Migrate older databases where boards.project_id was created NOT NULL,
+  // so standalone (hand-drawn) boards with no project can be inserted.
+  // DROP NOT NULL is idempotent on Postgres and a no-op if already nullable.
+  try {
+    await db.query(`ALTER TABLE boards ALTER COLUMN project_id DROP NOT NULL;`);
+  } catch {
+    // Table was just created (already nullable) or backend doesn't support it.
+  }
 }

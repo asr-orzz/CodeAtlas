@@ -65,8 +65,14 @@ export class ArchitectureAssistant {
           prompt: `${this.groundingContext()}\n\nQuestion: ${q}`,
         });
         return { answer, source: "provider" };
-      } catch {
-        // Fall through to the deterministic responder on provider failure.
+      } catch (err) {
+        // Fall through to the deterministic responder on provider failure,
+        // but surface why so a misconfigured key/model can be diagnosed.
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[codeatlas] AI provider (${this.provider.name}) failed, using deterministic answer:`,
+          err instanceof Error ? err.message : err,
+        );
       }
     }
 
