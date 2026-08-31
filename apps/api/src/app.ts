@@ -8,16 +8,37 @@ import express, {
   type Request,
   type Response,
 } from "express";
-import { BoardStore } from "./board-store.js";
+import {
+  createAuthRoutes,
+  PgUserStore,
+  type UserStore,
+} from "./auth.js";
+import { BoardStore, PgBoardStore } from "./board-store.js";
 import { config } from "./config.js";
+import { getPool } from "./db.js";
 import { HttpError } from "./http.js";
 import { createRoutes, type RouteDeps } from "./routes.js";
-import { ProjectStore } from "./store.js";
+import { PgProjectStore, type ProjectStore } from "./store.js";
+
+export interface AppStores {
+  projects: ProjectStore;
+  boards: BoardStore;
+  users: UserStore;
+}
+
+/** Production stores backed by the shared Postgres pool. */
+function defaultStores(): AppStores {
+  const pool = getPool();
+  return {
+    projects: new PgProjectStore(pool),
+    boards: new PgBoardStore(pool),
+    users: new PgUserStore(pool),
+  };
+}
 
 /** Build the Express app (without starting the listener) for reuse in tests. */
 export function createApp(
-  store: ProjectStore = new ProjectStore(config.dataDir),
-  boards: BoardStore = new BoardStore(config.dataDir),
+  stores: AppStores = defaultStores(),
   deps: RouteDeps = {},
 ): Express {
   const app = express();
@@ -27,16 +48,17 @@ export function createApp(
       origin: config.corsOrigin === "*" ? true : config.corsOrigin.split(","),
     }),
   );
-  app.use(express.json({ limit: "4mb" }));
+  app.use(express.json({ limit: "8mb" }));
 
   const serveWeb = Boolean(config.webDir && fs.existsSync(config.webDir));
 
-  // In single-port production mode the built web app lives at "/", so the JSON
-  // API index moves to "/api". Otherwise it stays at "/".
   const apiInfo = (_req: Request, res: Response) => {
     res.json({
       name: "CodeAtlas API",
       endpoints: [
+        "POST /api/auth/register",
+        "POST /api/auth/login",
+        "GET /api/auth/me",
         "POST /api/analyze",
         "POST /api/analyze/github",
         "GET /api/projects",
@@ -60,7 +82,8 @@ export function createApp(
 
   if (!serveWeb) app.get("/", apiInfo);
 
-  app.use("/api", createRoutes(store, boards, deps));
+  app.use("/api/auth", createAuthRoutes(stores.users));
+  app.use("/api", createRoutes(stores.projects, stores.boards, deps));
 
   if (serveWeb && config.webDir) {
     const webDir = config.webDir;

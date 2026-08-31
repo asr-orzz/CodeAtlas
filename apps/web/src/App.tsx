@@ -1,233 +1,30 @@
-import { useCallback, useEffect, useState } from "react";
-import { api } from "./api/client";
-import { BoardView } from "./board/BoardView";
-import { AiPanel } from "./components/AiPanel";
-import { AnalyzeForm } from "./components/AnalyzeForm";
-import { DetailPanel } from "./components/DetailPanel";
-import { DiagramView, type DiagramRequest } from "./components/DiagramView";
-import { ProjectList } from "./components/ProjectList";
-import { ReportPanel } from "./components/ReportPanel";
-import type { CanvasAction, ProjectDetail, ProjectSummary } from "./types";
-
-type Mode = "explore" | "board";
+import { AuthProvider, useAuth } from "./auth/AuthContext";
+import { Logo } from "./components/Logo";
+import { Dashboard } from "./pages/Dashboard";
+import { Landing } from "./pages/Landing";
 
 export function App() {
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<ProjectDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [mode, setMode] = useState<Mode>("explore");
-  const [showAi, setShowAi] = useState(true);
-  const [diagramRequest, setDiagramRequest] = useState<DiagramRequest | undefined>(undefined);
-
-  const handleCanvasAction = useCallback((action: CanvasAction) => {
-    switch (action.type) {
-      case "focusNode":
-      case "highlightNodes":
-        setSelectedNodeId("nodeId" in action ? action.nodeId : (action.nodeIds[0] ?? null));
-        break;
-      case "showDiagram":
-        setDiagramRequest((r) => ({ kind: action.kind, nonce: (r?.nonce ?? 0) + 1 }));
-        break;
-      case "generateSequence":
-        setDiagramRequest((r) => ({
-          kind: "sequence",
-          entryId: action.entryId,
-          nonce: (r?.nonce ?? 0) + 1,
-        }));
-        break;
-    }
-  }, []);
-
-  const refreshProjects = useCallback(async () => {
-    try {
-      const { projects: list } = await api.listProjects();
-      setProjects(list);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }, []);
-
-  useEffect(() => {
-    void refreshProjects();
-  }, [refreshProjects]);
-
-  useEffect(() => {
-    setSelectedNodeId(null);
-    setDiagramRequest(undefined);
-    if (!selectedId) {
-      setDetail(null);
-      return;
-    }
-    let cancelled = false;
-    setLoadingDetail(true);
-    api
-      .getProject(selectedId)
-      .then((d) => {
-        if (!cancelled) setDetail(d);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingDetail(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedId]);
-
-  async function handleDelete(id: string) {
-    try {
-      await api.deleteProject(id);
-      if (selectedId === id) setSelectedId(null);
-      await refreshProjects();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }
-
   return (
-    <div className="flex h-screen overflow-hidden">
-      <aside className="flex w-80 shrink-0 flex-col border-r border-surface-border bg-surface-raised">
-        <div className="border-b border-surface-border px-4 py-4">
-          <h1 className="text-sm font-bold text-slate-100">
-            CodeAtlas
-          </h1>
-          <p className="text-[11px] text-slate-500">
-            code → graph → diagrams → AI
-          </p>
-        </div>
-        <div className="border-b border-surface-border p-4">
-          <AnalyzeForm
-            onAnalyzed={async (result) => {
-              await refreshProjects();
-              setSelectedId(result.id);
-            }}
-          />
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <ProjectList
-            projects={projects}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onDelete={handleDelete}
-          />
-        </div>
-        <div className="border-t border-surface-border px-4 py-2 text-[10px] text-slate-600">
-          API: {api.baseUrl}
-        </div>
-      </aside>
-
-      <main className="flex min-w-0 flex-1 flex-col">
-        {error && (
-          <div className="border-b border-red-500/40 bg-red-500/10 px-4 py-2 text-xs text-red-300">
-            {error}
-          </div>
-        )}
-
-        {!detail ? (
-          <EmptyState loading={loadingDetail} hasProjects={projects.length > 0} />
-        ) : (
-          <>
-            <header className="flex items-center justify-between border-b border-surface-border px-6 py-4">
-              <div className="min-w-0">
-                <h2 className="truncate text-lg font-semibold text-slate-100">
-                  {detail.name}
-                </h2>
-                <p className="truncate text-xs text-slate-500">{detail.source}</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {mode === "explore" && (
-                  <button
-                    onClick={() => setShowAi((v) => !v)}
-                    className={`rounded-md border border-surface-border px-3 py-1 text-xs font-medium transition ${
-                      showAi ? "bg-accent/20 text-accent" : "text-slate-400 hover:text-slate-200"
-                    }`}
-                  >
-                    AI assistant
-                  </button>
-                )}
-                <div className="flex items-center gap-1 rounded-lg border border-surface-border bg-surface p-0.5">
-                  {(["explore", "board"] as Mode[]).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setMode(m)}
-                      className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition ${
-                        mode === m
-                          ? "bg-accent text-white"
-                          : "text-slate-400 hover:text-slate-200"
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </header>
-            {mode === "explore" ? (
-              <div className="flex min-h-0 flex-1 flex-col gap-4 p-6">
-                <div className="shrink-0">
-                  <ReportPanel project={detail} />
-                </div>
-                <div className="flex min-h-0 flex-1 gap-4">
-                  <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-surface-border bg-surface">
-                    <DiagramView
-                      projectId={detail.id}
-                      onSelectNode={setSelectedNodeId}
-                      request={diagramRequest}
-                    />
-                    {selectedNodeId && (
-                      <DetailPanel
-                        ir={detail.ir}
-                        nodeId={selectedNodeId}
-                        onClose={() => setSelectedNodeId(null)}
-                      />
-                    )}
-                  </div>
-                  {showAi && (
-                    <AiPanel
-                      projectId={detail.id}
-                      onFocusNode={setSelectedNodeId}
-                      onCanvasAction={handleCanvasAction}
-                    />
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="min-h-0 flex-1">
-                <BoardView projectId={detail.id} />
-              </div>
-            )}
-          </>
-        )}
-      </main>
-    </div>
+    <AuthProvider>
+      <Root />
+    </AuthProvider>
   );
 }
 
-function EmptyState({
-  loading,
-  hasProjects,
-}: {
-  loading: boolean;
-  hasProjects: boolean;
-}) {
+function Root() {
+  const { user, loading } = useAuth();
+  if (loading) return <Splash />;
+  return user ? <Dashboard /> : <Landing />;
+}
+
+function Splash() {
   return (
-    <div className="flex flex-1 items-center justify-center p-8 text-center">
-      <div className="max-w-sm">
-        <div className="mb-3 text-4xl">🧭</div>
-        <h2 className="mb-1 text-lg font-semibold text-slate-200">
-          {loading ? "Loading…" : "Explore a codebase"}
-        </h2>
-        <p className="text-sm text-slate-500">
-          {hasProjects
-            ? "Select a project on the left to see its architecture report."
-            : "Analyze a GitHub repository or a local folder to build its fact-based architecture graph."}
-        </p>
+    <div className="aurora flex h-screen items-center justify-center bg-surface">
+      <div className="flex flex-col items-center gap-4">
+        <Logo className="h-14 w-14 animate-float" />
+        <div className="h-1 w-32 overflow-hidden rounded-full bg-white/10">
+          <div className="h-full w-1/2 animate-[shimmer_1.4s_linear_infinite] bg-gradient-to-r from-transparent via-accent-soft to-transparent" />
+        </div>
       </div>
     </div>
   );

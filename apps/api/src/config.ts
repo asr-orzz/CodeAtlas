@@ -2,7 +2,7 @@ import path from "node:path";
 
 export const config = {
   port: Number(process.env.ARCHX_PORT ?? process.env.PORT ?? 4000),
-  /** Where analyzed projects and saved boards are persisted. */
+  /** Scratch space for cloned repos during analysis (never persisted). */
   dataDir: process.env.ARCHX_DATA_DIR
     ? path.resolve(process.env.ARCHX_DATA_DIR)
     : path.resolve(process.cwd(), "data"),
@@ -15,4 +15,10 @@ export const config = {
   webDir: process.env.ARCHX_WEB_DIR
     ? path.resolve(process.env.ARCHX_WEB_DIR)
     : undefined,
+  /** Postgres connection string (Neon). Required to start the real server. */
+  databaseUrl: process.env.DATABASE_URL,
+  /** Secret used to sign auth JWTs. */
+  jwtSecret: process.env.JWT_SECRET ?? "dev-insecure-secret-change-me",
+  /** How long an auth token stays valid. */
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
 };

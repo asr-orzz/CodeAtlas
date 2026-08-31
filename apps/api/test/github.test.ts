@@ -1,5 +1,3 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
@@ -9,14 +7,16 @@ import {
   type CloneResult,
   type Cloner,
 } from "../src/github.js";
-import { ProjectStore } from "../src/store.js";
+import { MemoryProjectStore, type ProjectStore } from "../src/store.js";
 
 const fixtureDir = fileURLToPath(
   new URL("../../../packages/analyzer/test/fixtures/sample", import.meta.url),
 );
 
+const USER = "user-1";
+
 function newStore(): ProjectStore {
-  return new ProjectStore(mkdtempSync(path.join(tmpdir(), "archx-gh-")));
+  return new MemoryProjectStore();
 }
 
 describe("parseRepoUrl", () => {
@@ -42,7 +42,7 @@ describe("parseRepoUrl", () => {
 });
 
 describe("importFromGitHub", () => {
-  it("clones, analyzes, records provenance and cleans up", () => {
+  it("clones, analyzes, records provenance and cleans up", async () => {
     const cleanup = vi.fn();
     const stubCloner: Cloner = (): CloneResult => ({
       dir: fixtureDir,
@@ -52,8 +52,9 @@ describe("importFromGitHub", () => {
     });
 
     const store = newStore();
-    const record = importFromGitHub(store, { url: "octo/demo" }, stubCloner);
+    const record = await importFromGitHub(store, USER, { url: "octo/demo" }, stubCloner);
 
+    expect(record.userId).toBe(USER);
     expect(record.source).toBe("https://github.com/octo/demo");
     expect(record.name).toBe("demo");
     expect(record.ir.meta.owner).toBe("octo");
@@ -62,7 +63,7 @@ describe("importFromGitHub", () => {
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
-  it("cleans up even if analysis throws", () => {
+  it("cleans up even if analysis throws", async () => {
     const cleanup = vi.fn();
     const stubCloner: Cloner = (): CloneResult => ({
       dir: path.join(fixtureDir, "definitely-missing"),
@@ -71,7 +72,7 @@ describe("importFromGitHub", () => {
     const store = newStore();
     // analyzing a non-existent dir yields an empty analysis (no throw), so this
     // mainly asserts cleanup runs on the normal path with an odd directory.
-    importFromGitHub(store, { url: "octo/demo" }, stubCloner);
+    await importFromGitHub(store, USER, { url: "octo/demo" }, stubCloner);
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 });

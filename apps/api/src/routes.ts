@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Router } from "express";
+import { Router, type Request } from "express";
 import {
   generateClassDiagram,
   generateComponentDiagram,
@@ -14,6 +14,7 @@ import {
   type AiProvider,
 } from "@archx/ai";
 import { runAnalysis } from "./analyze.js";
+import { requireAuth, type AuthedRequest } from "./auth.js";
 import {
   type Board,
   type BoardContent,
@@ -146,6 +147,13 @@ function boardResponse(board: Board) {
   return board;
 }
 
+/** The authenticated user id, guaranteed present after requireAuth. */
+function uid(req: Request): string {
+  const id = (req as AuthedRequest).userId;
+  if (!id) throw new HttpError(401, "Authentication required.");
+  return id;
+}
+
 export function createRoutes(
   store: ProjectStore,
   boards: BoardStore,
@@ -160,14 +168,17 @@ export function createRoutes(
   router.get(
     "/health",
     asyncHandler((_req, res) => {
-      res.json({ ok: true, projects: store.list().length });
+      res.json({ ok: true });
     }),
   );
+
+  // Everything below requires a logged-in user.
+  router.use(requireAuth);
 
   // Analyze a local directory.
   router.post(
     "/analyze",
-    asyncHandler((req, res) => {
+    asyncHandler(async (req, res) => {
       const body = (req.body ?? {}) as { path?: unknown; name?: unknown };
       if (typeof body.path !== "string" || body.path.trim() === "") {
         throw new HttpError(400, "Body must include a non-empty 'path' string.");
@@ -189,7 +200,7 @@ export function createRoutes(
           : path.basename(resolved) || resolved;
 
       const { ir, report } = runAnalysis(resolved, { rootPath: resolved });
-      const record = store.create({ name, source: resolved, ir, report });
+      const record = await store.create(uid(req), { name, source: resolved, ir, report });
       res.status(201).json(importResponse(record));
     }),
   );
@@ -197,7 +208,7 @@ export function createRoutes(
   // Import and analyze a public GitHub repository.
   router.post(
     "/analyze/github",
-    asyncHandler((req, res) => {
+    asyncHandler(async (req, res) => {
       const body = (req.body ?? {}) as {
         url?: unknown;
         branch?: unknown;
@@ -206,8 +217,9 @@ export function createRoutes(
       if (typeof body.url !== "string" || body.url.trim() === "") {
         throw new HttpError(400, "Body must include a non-empty 'url' string.");
       }
-      const record = importFromGitHub(
+      const record = await importFromGitHub(
         store,
+        uid(req),
         {
           url: body.url,
           branch: typeof body.branch === "string" ? body.branch : undefined,
@@ -221,15 +233,15 @@ export function createRoutes(
 
   router.get(
     "/projects",
-    asyncHandler((_req, res) => {
-      res.json({ projects: store.list() });
+    asyncHandler(async (req, res) => {
+      res.json({ projects: await store.list(uid(req)) });
     }),
   );
 
   router.get(
     "/projects/:id",
-    asyncHandler((req, res) => {
-      const record = requireProject(store, req.params.id);
+    asyncHandler(async (req, res) => {
+      const record = await requireProject(store, uid(req), req.params.id);
       res.json({
         id: record.id,
         name: record.name,
@@ -243,12 +255,13 @@ export function createRoutes(
 
   router.delete(
     "/projects/:id",
-    asyncHandler((req, res) => {
+    asyncHandler(async (req, res) => {
+      const userId = uid(req);
       const id = req.params.id ?? "";
-      if (!store.delete(id)) {
+      if (!(await store.delete(userId, id))) {
         throw new HttpError(404, "Project not found.");
       }
-      boards.deleteByProject(id);
+      await boards.deleteByProject(userId, id);
       res.status(204).end();
     }),
   );
@@ -257,16 +270,18 @@ export function createRoutes(
 
   router.get(
     "/projects/:id/boards",
-    asyncHandler((req, res) => {
-      const record = requireProject(store, req.params.id);
-      res.json({ boards: boards.listByProject(record.id) });
+    asyncHandler(async (req, res) => {
+      const userId = uid(req);
+      const record = await requireProject(store, userId, req.params.id);
+      res.json({ boards: await boards.listByProject(userId, record.id) });
     }),
   );
 
   router.post(
     "/projects/:id/boards",
-    asyncHandler((req, res) => {
-      const record = requireProject(store, req.params.id);
+    asyncHandler(async (req, res) => {
+      const userId = uid(req);
+      const record = await requireProject(store, userId, req.params.id);
       const body = (req.body ?? {}) as { name?: unknown; seedKind?: unknown };
       const name =
         typeof body.name === "string" && body.name.trim()
@@ -279,15 +294,15 @@ export function createRoutes(
         }
         content = seedContent(record, body.seedKind);
       }
-      const board = boards.create(record.id, name, content);
+      const board = await boards.create(userId, record.id, name, content);
       res.status(201).json(boardResponse(board));
     }),
   );
 
   router.get(
     "/boards/:boardId",
-    asyncHandler((req, res) => {
-      const board = boards.get(req.params.boardId ?? "");
+    asyncHandler(async (req, res) => {
+      const board = await boards.get(uid(req), req.params.boardId ?? "");
       if (!board) throw new HttpError(404, "Board not found.");
       res.json(boardResponse(board));
     }),
@@ -295,9 +310,9 @@ export function createRoutes(
 
   router.put(
     "/boards/:boardId",
-    asyncHandler((req, res) => {
+    asyncHandler(async (req, res) => {
       const content = parseBoardContent(req.body);
-      const board = boards.update(req.params.boardId ?? "", content);
+      const board = await boards.update(uid(req), req.params.boardId ?? "", content);
       if (!board) throw new HttpError(404, "Board not found.");
       res.json(boardResponse(board));
     }),
@@ -305,8 +320,8 @@ export function createRoutes(
 
   router.delete(
     "/boards/:boardId",
-    asyncHandler((req, res) => {
-      if (!boards.delete(req.params.boardId ?? "")) {
+    asyncHandler(async (req, res) => {
+      if (!(await boards.delete(uid(req), req.params.boardId ?? ""))) {
         throw new HttpError(404, "Board not found.");
       }
       res.status(204).end();
@@ -315,8 +330,8 @@ export function createRoutes(
 
   router.get(
     "/projects/:id/diagram/:kind",
-    asyncHandler((req, res) => {
-      const record = requireProject(store, req.params.id);
+    asyncHandler(async (req, res) => {
+      const record = await requireProject(store, uid(req), req.params.id);
       const kind = req.params.kind ?? "";
       if (!DIAGRAM_KINDS.has(kind)) {
         throw new HttpError(400, `Unknown diagram kind: ${kind}`);
@@ -334,8 +349,8 @@ export function createRoutes(
 
   router.get(
     "/projects/:id/graph/:view",
-    asyncHandler((req, res) => {
-      const record = requireProject(store, req.params.id);
+    asyncHandler(async (req, res) => {
+      const record = await requireProject(store, uid(req), req.params.id);
       const view = (req.params.view ?? "") as GraphViewKind;
       if (!GRAPH_VIEWS.has(view)) {
         throw new HttpError(400, `Unknown graph view: ${view}`);
@@ -348,24 +363,24 @@ export function createRoutes(
 
   router.get(
     "/projects/:id/ai/explain",
-    asyncHandler((req, res) => {
-      const record = requireProject(store, req.params.id);
+    asyncHandler(async (req, res) => {
+      const record = await requireProject(store, uid(req), req.params.id);
       res.json({ text: assistantFor(record).explain() });
     }),
   );
 
   router.get(
     "/projects/:id/ai/smells",
-    asyncHandler((req, res) => {
-      const record = requireProject(store, req.params.id);
+    asyncHandler(async (req, res) => {
+      const record = await requireProject(store, uid(req), req.params.id);
       res.json({ smells: assistantFor(record).smells() });
     }),
   );
 
   router.get(
     "/projects/:id/ai/cycles",
-    asyncHandler((req, res) => {
-      const record = requireProject(store, req.params.id);
+    asyncHandler(async (req, res) => {
+      const record = await requireProject(store, uid(req), req.params.id);
       res.json({ text: assistantFor(record).cycles() });
     }),
   );
@@ -373,7 +388,7 @@ export function createRoutes(
   router.post(
     "/projects/:id/ai/ask",
     asyncHandler(async (req, res) => {
-      const record = requireProject(store, req.params.id);
+      const record = await requireProject(store, uid(req), req.params.id);
       const body = (req.body ?? {}) as { question?: unknown };
       if (typeof body.question !== "string" || body.question.trim() === "") {
         throw new HttpError(400, "Body must include a non-empty 'question' string.");
@@ -389,8 +404,8 @@ export function createRoutes(
 
   router.get(
     "/projects/:id/nodes/:nodeId/:relation",
-    asyncHandler((req, res) => {
-      const record = requireProject(store, req.params.id);
+    asyncHandler(async (req, res) => {
+      const record = await requireProject(store, uid(req), req.params.id);
       const relation = req.params.relation ?? "";
       if (!RELATIONS.has(relation)) {
         throw new HttpError(400, `Unknown relation: ${relation}`);
@@ -413,8 +428,8 @@ export function createRoutes(
 
   router.get(
     "/projects/:id/path",
-    asyncHandler((req, res) => {
-      const record = requireProject(store, req.params.id);
+    asyncHandler(async (req, res) => {
+      const record = await requireProject(store, uid(req), req.params.id);
       const from = typeof req.query.from === "string" ? req.query.from : "";
       const to = typeof req.query.to === "string" ? req.query.to : "";
       if (!from || !to) {
@@ -431,8 +446,12 @@ export function createRoutes(
   return router;
 }
 
-function requireProject(store: ProjectStore, id: string | undefined) {
-  const record = id ? store.get(id) : undefined;
+async function requireProject(
+  store: ProjectStore,
+  userId: string,
+  id: string | undefined,
+): Promise<ProjectRecord> {
+  const record = id ? await store.get(userId, id) : undefined;
   if (!record) throw new HttpError(404, "Project not found.");
   return record;
 }

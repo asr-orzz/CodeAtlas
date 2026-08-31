@@ -37,15 +37,15 @@ export function AnalyzeForm({ onAnalyzed }: Props) {
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <div className="flex gap-1 rounded-lg bg-surface p-1">
+      <div className="flex gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
         {(["github", "local"] as Mode[]).map((m) => (
           <button
             key={m}
             type="button"
             onClick={() => setMode(m)}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${
+            className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
               mode === m
-                ? "bg-accent text-white"
+                ? "bg-gradient-to-r from-accent to-accent-soft text-white shadow-glow"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -60,7 +60,7 @@ export function AnalyzeForm({ onAnalyzed }: Props) {
         placeholder={
           mode === "github" ? "owner/repo or https://github.com/owner/repo" : "C:\\path\\to\\project"
         }
-        className="w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+        className="input"
       />
 
       {mode === "github" && (
@@ -68,20 +68,20 @@ export function AnalyzeForm({ onAnalyzed }: Props) {
           value={branch}
           onChange={(e) => setBranch(e.target.value)}
           placeholder="branch (optional)"
-          className="w-full rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+          className="input"
         />
       )}
 
       <button
         type="submit"
         disabled={busy || !value.trim()}
-        className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white transition hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
+        className="btn-primary w-full"
       >
-        {busy ? "Analyzing…" : "Analyze"}
+        {busy ? "Analyzing…" : "Analyze repository"}
       </button>
 
       {error && (
-        <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+        <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
           {error}
         </p>
       )}

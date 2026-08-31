@@ -138,11 +138,12 @@ export interface GitHubImportInput {
  * Clone a GitHub repository, analyze it, store the result, and always clean up
  * the working copy afterwards.
  */
-export function importFromGitHub(
+export async function importFromGitHub(
   store: ProjectStore,
+  userId: string,
   input: GitHubImportInput,
   cloner: Cloner = gitClone,
-): ProjectRecord {
+): Promise<ProjectRecord> {
   const parsed = parseRepoUrl(input.url);
   const clone = cloner(parsed, { branch: input.branch });
   try {
@@ -153,7 +154,7 @@ export function importFromGitHub(
       commit: clone.commit,
       rootPath: clone.dir,
     });
-    return store.create({
+    return await store.create(userId, {
       name: input.name?.trim() || parsed.repo,
       source: parsed.webUrl,
       ir,

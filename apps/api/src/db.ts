@@ -1,48 +1,63 @@
-import fs from "node:fs";
-import path from "node:path";
-import Database from "better-sqlite3";
+import { Pool } from "pg";
+import { config } from "./config.js";
+
+let pool: Pool | undefined;
 
 /**
- * One shared connection per database file. ProjectStore and BoardStore both open
- * the same file, so sharing avoids competing WAL writers and keeps everything in
- * a single, real, persistent SQLite database.
+ * Lazily create the shared Postgres connection pool from DATABASE_URL. Neon
+ * requires TLS; we enable it whenever the URL points at a non-local host.
  */
-const connections = new Map<string, Database.Database>();
-
-export function openDb(dataDir: string): Database.Database {
-  const file = path.join(dataDir, "codeatlas.db");
-  const existing = connections.get(file);
-  if (existing) return existing;
-
-  fs.mkdirSync(dataDir, { recursive: true });
-  const db = new Database(file);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS projects (
-      id         TEXT PRIMARY KEY,
-      name       TEXT NOT NULL,
-      source     TEXT NOT NULL,
-      createdAt  TEXT NOT NULL,
-      nodeCount  INTEGER NOT NULL DEFAULT 0,
-      edgeCount  INTEGER NOT NULL DEFAULT 0,
-      cycleCount INTEGER NOT NULL DEFAULT 0,
-      ir         TEXT NOT NULL,
-      report     TEXT NOT NULL
+export function getPool(): Pool {
+  if (pool) return pool;
+  if (!config.databaseUrl) {
+    throw new Error(
+      "DATABASE_URL is not set. CodeAtlas needs a Postgres connection " +
+        "string (e.g. a Neon database URL) to start.",
     );
+  }
+  const local = /localhost|127\.0\.0\.1/.test(config.databaseUrl);
+  pool = new Pool({
+    connectionString: config.databaseUrl,
+    ssl: local ? undefined : { rejectUnauthorized: false },
+  });
+  return pool;
+}
+
+/** Create tables if they don't exist. Safe to run on every boot. */
+export async function initSchema(db: Pool = getPool()): Promise<void> {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id            UUID PRIMARY KEY,
+      email         TEXT UNIQUE NOT NULL,
+      name          TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS projects (
+      id          UUID PRIMARY KEY,
+      user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name        TEXT NOT NULL,
+      source      TEXT NOT NULL,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      node_count  INTEGER NOT NULL DEFAULT 0,
+      edge_count  INTEGER NOT NULL DEFAULT 0,
+      cycle_count INTEGER NOT NULL DEFAULT 0,
+      ir          JSONB NOT NULL,
+      report      JSONB NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
 
     CREATE TABLE IF NOT EXISTS boards (
-      id         TEXT PRIMARY KEY,
-      projectId  TEXT NOT NULL,
+      id         UUID PRIMARY KEY,
+      user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       name       TEXT NOT NULL,
-      nodes      TEXT NOT NULL,
-      edges      TEXT NOT NULL,
-      createdAt  TEXT NOT NULL,
-      updatedAt  TEXT NOT NULL
+      nodes      JSONB NOT NULL,
+      edges      JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
-    CREATE INDEX IF NOT EXISTS idx_boards_project ON boards(projectId);
+    CREATE INDEX IF NOT EXISTS idx_boards_project ON boards(project_id);
   `);
-
-  connections.set(file, db);
-  return db;
 }

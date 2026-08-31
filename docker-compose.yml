@@ -6,8 +6,11 @@ services:
       - "4000:4000"
     environment:
       ARCHX_CORS_ORIGIN: "*"
+      # REQUIRED: Neon (or any) Postgres connection string. Put it in a local .env file.
+      DATABASE_URL: ${DATABASE_URL:-}
+      # Secret for signing login tokens.
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string}
       # Enable the AI assistant with a free Grok model via OpenRouter.
-      # Put OPENROUTER_API_KEY in a local .env file (compose reads it automatically).
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-x-ai/grok-4-fast:free}
     volumes:

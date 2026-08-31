@@ -9,11 +9,6 @@
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
 
-# Toolchain for compiling native deps (better-sqlite3) if no prebuilt is found.
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ \
-  && rm -rf /var/lib/apt/lists/*
-
 # Install workspace dependencies first (better layer caching).
 COPY package.json package-lock.json ./
 COPY packages ./packages

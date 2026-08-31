@@ -167,6 +167,20 @@ export interface AiAnswer {
   action?: CanvasAction;
 }
 
+// --- Auth ---
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
+}
+
 export type GraphViewKind = "dependency" | "call";
 
 export interface GraphView {

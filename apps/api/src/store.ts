@@ -1,13 +1,11 @@
 import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import type Database from "better-sqlite3";
+import type { Pool } from "pg";
 import type { ArchitectureGraph } from "@archx/core";
 import type { ArchitectureReport } from "@archx/architecture";
-import { openDb } from "./db.js";
 
 export interface ProjectRecord {
   id: string;
+  userId: string;
   name: string;
   /** Where it came from: a local path or a GitHub URL. */
   source: string;
@@ -26,122 +24,134 @@ export interface ProjectSummary {
   cycleCount: number;
 }
 
-interface ProjectRow {
-  id: string;
-  name: string;
-  source: string;
-  createdAt: string;
-  nodeCount: number;
-  edgeCount: number;
-  cycleCount: number;
-  ir: string;
-  report: string;
+export type NewProject = Omit<ProjectRecord, "id" | "userId" | "createdAt">;
+
+/** Per-user project persistence. Implemented over Postgres and in memory. */
+export interface ProjectStore {
+  create(userId: string, input: NewProject): Promise<ProjectRecord>;
+  get(userId: string, id: string): Promise<ProjectRecord | undefined>;
+  list(userId: string): Promise<ProjectSummary[]>;
+  delete(userId: string, id: string): Promise<boolean>;
 }
 
-/**
- * Persistent, SQLite-backed project store. Each analysis is a row in a real
- * database file (`codeatlas.db`), so everything survives restarts and scales
- * far past a folder full of JSON files. The public API is unchanged.
- */
-export class ProjectStore {
-  private readonly db: Database.Database;
+function summarize(r: ProjectRecord): ProjectSummary {
+  return {
+    id: r.id,
+    name: r.name,
+    source: r.source,
+    createdAt: r.createdAt,
+    nodeCount: r.ir.nodes.length,
+    edgeCount: r.ir.edges.length,
+    cycleCount: r.report.cycles.length,
+  };
+}
 
-  constructor(dataDir: string) {
-    this.db = openDb(dataDir);
-    this.migrateLegacyJson(dataDir);
-  }
+/** Postgres-backed project store (production). */
+export class PgProjectStore implements ProjectStore {
+  constructor(private readonly pool: Pool) {}
 
-  /** One-time import of pre-database `data/projects/*.json` files. */
-  private migrateLegacyJson(dataDir: string): void {
-    const legacyDir = path.join(dataDir, "projects");
-    if (!fs.existsSync(legacyDir)) return;
-    const count = this.db
-      .prepare("SELECT COUNT(*) AS n FROM projects")
-      .get() as { n: number };
-    if (count.n > 0) return;
-
-    let files: string[] = [];
-    try {
-      files = fs.readdirSync(legacyDir).filter((f) => f.endsWith(".json"));
-    } catch {
-      return;
-    }
-    for (const file of files) {
-      try {
-        const raw = fs.readFileSync(path.join(legacyDir, file), "utf8");
-        const record = JSON.parse(raw) as ProjectRecord;
-        if (record.id) this.insert(record);
-      } catch {
-        // Skip corrupt legacy files rather than crash on startup.
-      }
-    }
-  }
-
-  private insert(record: ProjectRecord): void {
-    this.db
-      .prepare(
-        `INSERT OR REPLACE INTO projects
-           (id, name, source, createdAt, nodeCount, edgeCount, cycleCount, ir, report)
-         VALUES (@id, @name, @source, @createdAt, @nodeCount, @edgeCount, @cycleCount, @ir, @report)`,
-      )
-      .run({
-        id: record.id,
-        name: record.name,
-        source: record.source,
-        createdAt: record.createdAt,
-        nodeCount: record.ir.nodes.length,
-        edgeCount: record.ir.edges.length,
-        cycleCount: record.report.cycles.length,
-        ir: JSON.stringify(record.ir),
-        report: JSON.stringify(record.report),
-      });
-  }
-
-  create(input: Omit<ProjectRecord, "id" | "createdAt">): ProjectRecord {
+  async create(userId: string, input: NewProject): Promise<ProjectRecord> {
     const record: ProjectRecord = {
       ...input,
       id: randomUUID(),
+      userId,
       createdAt: new Date().toISOString(),
     };
-    this.insert(record);
+    await this.pool.query(
+      `INSERT INTO projects
+         (id, user_id, name, source, created_at, node_count, edge_count, cycle_count, ir, report)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb)`,
+      [
+        record.id,
+        userId,
+        record.name,
+        record.source,
+        record.createdAt,
+        record.ir.nodes.length,
+        record.ir.edges.length,
+        record.report.cycles.length,
+        JSON.stringify(record.ir),
+        JSON.stringify(record.report),
+      ],
+    );
     return record;
   }
 
-  get(id: string): ProjectRecord | undefined {
-    const row = this.db
-      .prepare("SELECT * FROM projects WHERE id = ?")
-      .get(id) as ProjectRow | undefined;
+  async get(userId: string, id: string): Promise<ProjectRecord | undefined> {
+    const { rows } = await this.pool.query(
+      `SELECT id, user_id, name, source, created_at, ir, report
+       FROM projects WHERE id = $1 AND user_id = $2`,
+      [id, userId],
+    );
+    const row = rows[0];
     if (!row) return undefined;
     return {
       id: row.id,
+      userId: row.user_id,
       name: row.name,
       source: row.source,
-      createdAt: row.createdAt,
-      ir: JSON.parse(row.ir) as ArchitectureGraph,
-      report: JSON.parse(row.report) as ArchitectureReport,
+      createdAt: new Date(row.created_at).toISOString(),
+      ir: row.ir as ArchitectureGraph,
+      report: row.report as ArchitectureReport,
     };
   }
 
-  list(): ProjectSummary[] {
-    const rows = this.db
-      .prepare(
-        `SELECT id, name, source, createdAt, nodeCount, edgeCount, cycleCount
-         FROM projects ORDER BY createdAt DESC`,
-      )
-      .all() as Omit<ProjectRow, "ir" | "report">[];
+  async list(userId: string): Promise<ProjectSummary[]> {
+    const { rows } = await this.pool.query(
+      `SELECT id, name, source, created_at, node_count, edge_count, cycle_count
+       FROM projects WHERE user_id = $1 ORDER BY created_at DESC`,
+      [userId],
+    );
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
       source: r.source,
-      createdAt: r.createdAt,
-      nodeCount: r.nodeCount,
-      edgeCount: r.edgeCount,
-      cycleCount: r.cycleCount,
+      createdAt: new Date(r.created_at).toISOString(),
+      nodeCount: r.node_count,
+      edgeCount: r.edge_count,
+      cycleCount: r.cycle_count,
     }));
   }
 
-  delete(id: string): boolean {
-    const info = this.db.prepare("DELETE FROM projects WHERE id = ?").run(id);
-    return info.changes > 0;
+  async delete(userId: string, id: string): Promise<boolean> {
+    const { rowCount } = await this.pool.query(
+      `DELETE FROM projects WHERE id = $1 AND user_id = $2`,
+      [id, userId],
+    );
+    return (rowCount ?? 0) > 0;
+  }
+}
+
+/** In-memory project store (tests / ephemeral use). */
+export class MemoryProjectStore implements ProjectStore {
+  private readonly records = new Map<string, ProjectRecord>();
+
+  async create(userId: string, input: NewProject): Promise<ProjectRecord> {
+    const record: ProjectRecord = {
+      ...input,
+      id: randomUUID(),
+      userId,
+      createdAt: new Date().toISOString(),
+    };
+    this.records.set(record.id, record);
+    return record;
+  }
+
+  async get(userId: string, id: string): Promise<ProjectRecord | undefined> {
+    const r = this.records.get(id);
+    return r && r.userId === userId ? r : undefined;
+  }
+
+  async list(userId: string): Promise<ProjectSummary[]> {
+    return [...this.records.values()]
+      .filter((r) => r.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map(summarize);
+  }
+
+  async delete(userId: string, id: string): Promise<boolean> {
+    const r = this.records.get(id);
+    if (!r || r.userId !== userId) return false;
+    return this.records.delete(id);
   }
 }

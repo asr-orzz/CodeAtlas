@@ -63,27 +63,32 @@ apps/
 
 ## Tech stack
 
-Chosen so the project **runs after a single `npm install`**, with no external
-database, message queue, or Docker required:
-
 - TypeScript everywhere, npm workspaces monorepo
 - [`ts-morph`](https://ts-morph.com/) for AST parsing (pure JS, no native builds)
 - Hand-written graph algorithms
 - [`dagre`](https://github.com/dagrejs/dagre) for hierarchical layout
-- Express API with a persistent **SQLite** database ([`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3))
-- Vite + React + Tailwind CSS + React Flow for the interactive canvas
+- Express API with **Postgres** ([`pg`](https://node-postgres.com/)) — works great with a free [Neon](https://neon.tech) database
+- **Email + password auth** (bcrypt + JWT); every project is private to its owner
+- Vite + React + Tailwind CSS + React Flow for the interactive canvas, with a
+  modern dark, glassmorphism landing + app UI
 - Pluggable AI layer with a **deterministic fallback**, so it works without an API key
   (drop in a free **Grok** model via OpenRouter to enable the full LLM assistant)
 
 ## Getting started
 
+CodeAtlas needs a Postgres database. The easiest option is a free
+[Neon](https://neon.tech) project — create one and copy the **pooled**
+connection string.
+
 ```bash
 npm install
-npm run dev          # starts the API (:4000) and the web app together
+cp apps/api/.env.example apps/api/.env   # then paste your DATABASE_URL + set JWT_SECRET
+npm run dev                              # starts the API (:4000) and the web app together
 ```
 
-Then open the web app (Vite prints the URL, usually http://localhost:5173) and
-analyze a local folder path or a GitHub URL.
+Open the web app (Vite prints the URL, usually http://localhost:5173), **create
+an account**, then analyze a local folder path or a GitHub URL. Tables are
+created automatically on first boot.
 
 Prefer two terminals? Run them separately:
 
@@ -92,28 +97,27 @@ npm run api          # terminal 1 — Express API on :4000
 npm run web          # terminal 2 — Vite dev server
 ```
 
-> This is an MVP that captures the core technical story. Multiplayer (Yjs),
-> Postgres/Redis, GitHub OAuth and PR bots from the extended vision are intentionally
-> out of scope for the first working version.
-
 ## Run with Docker
 
 A single image builds the web app and serves it from the API on one port (4000):
 
+Set `DATABASE_URL` (and ideally `JWT_SECRET`) in a local `.env` — compose reads
+it automatically.
+
 ```bash
-# Using docker compose (recommended — persists data in a named volume)
+# Using docker compose (recommended)
 docker compose up --build
 # → open http://localhost:4000
 
 # Or with plain docker
 docker build -t codeatlas .
-docker run -p 4000:4000 -v codeatlas-data:/data codeatlas
+docker run -p 4000:4000 -e DATABASE_URL="postgres://…" -e JWT_SECRET="…" codeatlas
 ```
 
 The web app is served at `/` and the API under `/api` on the same origin, so no
-CORS or extra ports are needed. Analyzed projects and boards persist in the
-`/data` volume. `git` is included in the image for GitHub repo import (repos are
-only shallow-cloned and parsed, never executed).
+CORS or extra ports are needed. All data lives in your Postgres/Neon database;
+the `/data` volume only holds transient clones. `git` is included in the image
+for GitHub repo import (repos are only shallow-cloned and parsed, never executed).
 
 ## Configuration
 
@@ -126,8 +130,11 @@ cp apps/web/.env.example apps/web/.env
 
 | Variable            | Where     | Default                 | Purpose                                  |
 | ------------------- | --------- | ----------------------- | ---------------------------------------- |
+| `DATABASE_URL`      | api       | (required)              | Postgres connection string (e.g. Neon)   |
+| `JWT_SECRET`        | api       | dev placeholder         | Secret for signing login tokens          |
+| `JWT_EXPIRES_IN`    | api       | `7d`                    | How long a login stays valid             |
 | `ARCHX_PORT`        | api       | `4000`                  | API listen port                          |
-| `ARCHX_DATA_DIR`    | api       | `./data`                | Folder holding the SQLite DB (`codeatlas.db`) |
+| `ARCHX_DATA_DIR`    | api       | `./data`                | Scratch dir for cloned repos (not a DB)  |
 | `ARCHX_CORS_ORIGIN` | api       | `*`                     | Allowed CORS origins (comma-separated)   |
 | `ARCHX_WEB_DIR`     | api       | (unset)                 | Serve a built web bundle from the API (single-port mode) |
 | `VITE_API_URL`      | web       | `http://localhost:4000` | API base URL the frontend calls (set to empty for same-origin) |
@@ -153,13 +160,20 @@ If no key is set, the assistant automatically falls back to the deterministic,
 fact-based engine — nothing breaks offline. Free models on OpenRouter can be
 rate-limited or rotated, so pick a paid model for heavy use.
 
-**Data & persistence:** projects and boards live in a real SQLite database at
-`$ARCHX_DATA_DIR/codeatlas.db`. Any pre-existing `data/projects/*.json` and
-`data/boards/*.json` from older runs are imported automatically on first start.
+**Data & persistence:** users, projects and boards live in Postgres. Point
+`DATABASE_URL` at a free [Neon](https://neon.tech) database; the schema is
+created automatically on first boot. Every project and board is scoped to the
+account that created it.
 
 ## API reference
 
+All `/api/*` routes below require a `Authorization: Bearer <token>` header
+obtained from register/login.
+
 ```
+POST   /api/auth/register                     { email, password, name? }  → { token, user }
+POST   /api/auth/login                        { email, password }         → { token, user }
+GET    /api/auth/me                                                        → { user }
 POST   /api/analyze                          { path, name? }
 POST   /api/analyze/github                    { url, branch?, name? }
 GET    /api/projects

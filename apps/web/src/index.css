@@ -9,10 +9,72 @@ body,
 }
 
 body {
-  @apply bg-surface text-slate-200 antialiased;
+  @apply bg-surface font-sans text-slate-200 antialiased;
 }
 
 * {
   scrollbar-width: thin;
   scrollbar-color: #2b3245 transparent;
+}
+
+@layer components {
+  /* Frosted-glass surface used across cards, panels and the header. */
+  .glass {
+    @apply border border-white/10 bg-white/[0.04] backdrop-blur-xl;
+  }
+  .glass-strong {
+    @apply border border-white/10 bg-surface-raised/70 backdrop-blur-2xl;
+  }
+  /* Gradient text for headlines. */
+  .text-gradient {
+    @apply bg-gradient-to-r from-white via-indigo-200 to-accent-soft bg-clip-text text-transparent;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-accent to-accent-soft px-5 py-2.5 text-sm font-semibold text-white shadow-glow transition hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/10;
+  }
+  .input {
+    @apply w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-accent/70 focus:bg-white/[0.05] focus:ring-2 focus:ring-accent/30;
+  }
+}
+
+/* Aurora background used on the landing + auth screens. */
+.aurora {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.aurora::before,
+.aurora::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  filter: blur(90px);
+  opacity: 0.6;
+  border-radius: 9999px;
+}
+.aurora::before {
+  width: 45rem;
+  height: 45rem;
+  top: -18rem;
+  left: -10rem;
+  background: radial-gradient(circle at center, #7c6cff, transparent 60%);
+}
+.aurora::after {
+  width: 40rem;
+  height: 40rem;
+  bottom: -20rem;
+  right: -8rem;
+  background: radial-gradient(circle at center, #3b82f6, transparent 60%);
+}
+
+/* Subtle animated grid used behind the hero. */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(124, 108, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 108, 255, 0.07) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, #000 40%, transparent 100%);
 }
