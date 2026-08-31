@@ -48,6 +48,15 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
+  const code = (err as NodeJS.ErrnoException)?.code;
+  if (code === "ETIMEDOUT" || code === "ENOTFOUND" || code === "ECONNREFUSED") {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[codeatlas] Could not reach the database (${code}). Check DATABASE_URL — ` +
+        "use the POOLED Neon connection string (host contains '-pooler'), ending " +
+        "in '?sslmode=require', with no surrounding quotes or 'psql' prefix.",
+    );
+  }
   // eslint-disable-next-line no-console
   console.error("[codeatlas] Fatal startup error:", err);
   process.exit(1);

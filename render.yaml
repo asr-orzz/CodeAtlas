@@ -1,6 +1,7 @@
-# Render blueprint for the CodeAtlas API (backend).
-# Deploy: Render Dashboard → New → Blueprint → pick this repo.
+# Render blueprint for the CodeAtlas API (backend only).
 # The frontend is deployed separately on Vercel (see vercel.json).
+#
+# Deploy: Render Dashboard → New → Blueprint → pick this repo.
 services:
   - type: web
     name: codeatlas-api
@@ -22,11 +23,10 @@ services:
       # Auto-generated strong secret for signing login tokens.
       - key: JWT_SECRET
         generateValue: true
-      # Set to your Vercel domain (comma-separated) or "*" to allow any origin.
+      # Set to your Vercel URL (comma-separated), or "*" to allow any origin.
       - key: ARCHX_CORS_ORIGIN
         sync: false
-      # Optional: free Grok assistant via OpenRouter (leave unset for the
-      # deterministic engine).
+      # Optional: free Grok assistant via OpenRouter.
       - key: OPENROUTER_API_KEY
         sync: false
       - key: AI_MODEL

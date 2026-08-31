@@ -19,6 +19,9 @@ export function getPool(): Pool {
   pool = new Pool({
     connectionString: config.databaseUrl,
     ssl: local ? undefined : { rejectUnauthorized: false },
+    // Fail fast with a clear error instead of hanging on an unreachable host.
+    connectionTimeoutMillis: 15_000,
+    keepAlive: true,
   });
   return pool;
 }
