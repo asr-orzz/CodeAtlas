@@ -156,27 +156,31 @@ export function Dashboard() {
             }}
           />
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <ProjectList
-            projects={projects}
-            selectedId={selectedId}
-            onSelect={selectProject}
-            onDelete={handleDelete}
-          />
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-3">
+          <section>
+            <SectionHeader label="Repositories" count={projects.length} />
+            <ProjectList
+              projects={projects}
+              selectedId={selectedId}
+              onSelect={selectProject}
+              onDelete={handleDelete}
+            />
+          </section>
 
-          <div className="mt-5">
-            <div className="mb-2 flex items-center justify-between px-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                My boards
-              </span>
-              <button
-                onClick={createBlankBoard}
-                disabled={creatingBoard}
-                className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
-              >
-                + New
-              </button>
-            </div>
+          <section>
+            <SectionHeader
+              label="My boards"
+              count={boards.length}
+              action={
+                <button
+                  onClick={createBlankBoard}
+                  disabled={creatingBoard}
+                  className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
+                >
+                  <PlusIcon /> New
+                </button>
+              }
+            />
             {boards.length === 0 ? (
               <p className="px-1 text-xs text-slate-600">
                 Create a blank board to draw UML by hand.
@@ -187,14 +191,19 @@ export function Dashboard() {
                   <li key={b.id}>
                     <button
                       onClick={() => openBoard(b.id)}
-                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${
+                      className={`group flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition ${
                         activeBoardId === b.id
-                          ? "bg-accent/20 text-accent-soft"
-                          : "text-slate-300 hover:bg-white/5"
+                          ? "border-accent/60 bg-accent/10 text-white"
+                          : "border-transparent text-slate-300 hover:border-white/10 hover:bg-white/5"
                       }`}
                     >
-                      <span className="truncate">{b.name}</span>
-                      <span className="ml-2 shrink-0 text-[10px] text-slate-500">
+                      <BoardIcon
+                        className={
+                          activeBoardId === b.id ? "text-accent-soft" : "text-slate-500"
+                        }
+                      />
+                      <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                      <span className="shrink-0 rounded-md bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-400">
                         {b.nodeCount}
                       </span>
                     </button>
@@ -202,7 +211,7 @@ export function Dashboard() {
                 ))}
               </ul>
             )}
-          </div>
+          </section>
         </div>
         <UserMenu
           email={user?.email ?? ""}
@@ -238,36 +247,55 @@ export function Dashboard() {
           />
         ) : (
           <>
-            <header className="flex items-center justify-between border-b border-white/5 px-6 py-4">
+            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-surface-raised/30 px-6 py-4 backdrop-blur-xl">
               <div className="min-w-0">
-                <h2 className="truncate text-lg font-semibold text-white">
+                <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
+                  <span>Repositories</span>
+                  <span className="text-slate-700">/</span>
+                  <span className="truncate text-slate-400">{detail.name}</span>
+                </div>
+                <h2 className="mt-0.5 flex items-center gap-2 truncate text-lg font-semibold text-white">
                   {detail.name}
                 </h2>
-                <p className="truncate text-xs text-slate-500">{detail.source}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <StatBadge label="nodes" value={detail.ir.nodes.length} />
+                  <StatBadge label="edges" value={detail.ir.edges.length} />
+                  {detail.source && (
+                    <span className="max-w-[22rem] truncate rounded-md bg-white/5 px-2 py-0.5 text-[10px] text-slate-500">
+                      {detail.source}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {mode === "explore" && (
                   <button
                     onClick={() => setShowAi((v) => !v)}
-                    className={`rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium transition ${
+                    className={`inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium transition ${
                       showAi ? "bg-accent/20 text-accent-soft" : "text-slate-400 hover:text-slate-200"
                     }`}
                   >
-                    AI assistant
+                    <SparkleIcon /> AI assistant
                   </button>
                 )}
                 <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-0.5">
-                  {(["explore", "board"] as Mode[]).map((m) => (
+                  {(
+                    [
+                      ["explore", "Explore"],
+                      ["board", "Board"],
+                    ] as [Mode, string][]
+                  ).map(([m, label]) => (
                     <button
                       key={m}
                       onClick={() => setMode(m)}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition ${
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                         mode === m
                           ? "bg-gradient-to-r from-accent to-accent-soft text-white shadow-glow"
                           : "text-slate-400 hover:text-slate-200"
                       }`}
                     >
-                      {m}
+                      {m === "explore" ? <GraphIcon /> : <BoardIcon />}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -387,29 +415,121 @@ function EmptyState({
   creatingBoard: boolean;
 }) {
   return (
-    <div className="aurora flex flex-1 items-center justify-center p-8 text-center">
-      <div className="max-w-md animate-fade-up">
+    <div className="aurora flex flex-1 items-center justify-center p-8">
+      <div className="w-full max-w-2xl animate-fade-up text-center">
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-accent to-accent-soft text-3xl shadow-glow-lg">
           🧭
         </div>
         <h2 className="mb-2 text-2xl font-bold text-white">
-          {loading ? "Loading…" : "Explore a codebase"}
+          {loading
+            ? "Loading…"
+            : hasProjects
+              ? "Pick up where you left off"
+              : "Map your architecture"}
         </h2>
-        <p className="text-slate-400">
+        <p className="mx-auto max-w-md text-slate-400">
           {hasProjects
-            ? "Select a project on the left to see its architecture report, graphs and diagrams."
-            : "Analyze a GitHub repository to build its fact-based architecture graph — or start a blank board and design UML by hand."}
+            ? "Select a repository on the left to see its report, graphs and diagrams — or start a fresh board."
+            : "Turn a GitHub repository into a fact-based architecture graph, or design UML by hand on a blank board."}
         </p>
-        <div className="mt-6 flex items-center justify-center gap-3">
+
+        <div className="mt-8 grid gap-4 text-left sm:grid-cols-2">
+          <div className="glass rounded-2xl p-5">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-accent-soft">
+              <GraphIcon />
+            </div>
+            <h3 className="text-sm font-semibold text-white">Analyze a repository</h3>
+            <p className="mt-1 text-xs text-slate-400">
+              Paste a GitHub URL in the panel on the left to generate dependency,
+              class and sequence diagrams automatically.
+            </p>
+          </div>
+
           <button
             onClick={onCreateBoard}
             disabled={creatingBoard}
-            className="btn-primary"
+            className="glass group rounded-2xl p-5 text-left transition hover:border-accent/40 hover:bg-white/[0.06] disabled:opacity-60"
           >
-            {creatingBoard ? "Creating…" : "Create a blank board"}
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-soft text-white shadow-glow">
+              <PlusIcon />
+            </div>
+            <h3 className="text-sm font-semibold text-white">
+              {creatingBoard ? "Creating board…" : "Create a blank board"}
+            </h3>
+            <p className="mt-1 text-xs text-slate-400">
+              Start with an empty canvas and design class, component or ER diagrams
+              by hand.
+            </p>
           </button>
         </div>
       </div>
     </div>
+  );
+}
+
+function SectionHeader({
+  label,
+  count,
+  action,
+}: {
+  label: string;
+  count: number;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-2 flex items-center justify-between px-1">
+      <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        {label}
+        <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+          {count}
+        </span>
+      </span>
+      {action}
+    </div>
+  );
+}
+
+function StatBadge({ label, value }: { label: string; value: number }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md bg-white/5 px-2 py-0.5 text-[10px] text-slate-400">
+      <span className="font-semibold text-slate-200">{value}</span>
+      {label}
+    </span>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+      <path d="M10 4v12M4 10h12" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function BoardIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className={`h-3.5 w-3.5 ${className}`}>
+      <rect x="2.5" y="4" width="15" height="12" rx="1.5" />
+      <path d="M2.5 8h15M8 8v8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function GraphIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-3.5 w-3.5">
+      <circle cx="5" cy="6" r="2" />
+      <circle cx="15" cy="6" r="2" />
+      <circle cx="10" cy="15" r="2" />
+      <path d="M6.5 7.3 8.8 13M13.5 7.3 11.2 13M7 6h6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SparkleIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+      <path d="M10 1.5c.3 2.9 1.6 4.2 4.5 4.5-2.9.3-4.2 1.6-4.5 4.5-.3-2.9-1.6-4.2-4.5-4.5 2.9-.3 4.2-1.6 4.5-4.5zM15.5 11c.2 1.6.9 2.3 2.5 2.5-1.6.2-2.3.9-2.5 2.5-.2-1.6-.9-2.3-2.5-2.5 1.6-.2 2.3-.9 2.5-2.5z" />
+    </svg>
   );
 }
