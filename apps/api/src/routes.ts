@@ -266,6 +266,28 @@ export function createRoutes(
     }),
   );
 
+  // --- Standalone boards: hand-drawn UML not tied to any project ---
+
+  router.get(
+    "/boards",
+    asyncHandler(async (req, res) => {
+      res.json({ boards: await boards.listStandalone(uid(req)) });
+    }),
+  );
+
+  router.post(
+    "/boards",
+    asyncHandler(async (req, res) => {
+      const body = (req.body ?? {}) as { name?: unknown };
+      const name =
+        typeof body.name === "string" && body.name.trim()
+          ? body.name.trim()
+          : "Untitled board";
+      const board = await boards.create(uid(req), null, name);
+      res.status(201).json(boardResponse(board));
+    }),
+  );
+
   // --- Boards: manually edited architecture diagrams ---
 
   router.get(

@@ -122,6 +122,15 @@ export const api = {
       body: JSON.stringify({ name, seedKind }),
     }),
 
+  // Standalone boards (hand-drawn UML, not tied to a repo).
+  listStandaloneBoards: () => http<{ boards: BoardSummary[] }>("/api/boards"),
+
+  createStandaloneBoard: (name?: string) =>
+    http<Board>("/api/boards", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
   getBoard: (boardId: string) => http<Board>(`/api/boards/${boardId}`),
 
   saveBoard: (

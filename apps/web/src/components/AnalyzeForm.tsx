@@ -6,10 +6,7 @@ interface Props {
   onAnalyzed: (result: ImportResult) => void;
 }
 
-type Mode = "local" | "github";
-
 export function AnalyzeForm({ onAnalyzed }: Props) {
-  const [mode, setMode] = useState<Mode>("github");
   const [value, setValue] = useState("");
   const [branch, setBranch] = useState("");
   const [busy, setBusy] = useState(false);
@@ -21,10 +18,7 @@ export function AnalyzeForm({ onAnalyzed }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const result =
-        mode === "github"
-          ? await api.analyzeGithub(value.trim(), branch.trim() || undefined)
-          : await api.analyzePath(value.trim());
+      const result = await api.analyzeGithub(value.trim(), branch.trim() || undefined);
       onAnalyzed(result);
       setValue("");
       setBranch("");
@@ -37,40 +31,23 @@ export function AnalyzeForm({ onAnalyzed }: Props) {
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <div className="flex gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
-        {(["github", "local"] as Mode[]).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setMode(m)}
-            className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-              mode === m
-                ? "bg-gradient-to-r from-accent to-accent-soft text-white shadow-glow"
-                : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            {m === "github" ? "GitHub repo" : "Local path"}
-          </button>
-        ))}
-      </div>
+      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+        Analyze a GitHub repo
+      </p>
 
       <input
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder={
-          mode === "github" ? "owner/repo or https://github.com/owner/repo" : "C:\\path\\to\\project"
-        }
+        placeholder="owner/repo or https://github.com/owner/repo"
         className="input"
       />
 
-      {mode === "github" && (
-        <input
-          value={branch}
-          onChange={(e) => setBranch(e.target.value)}
-          placeholder="branch (optional)"
-          className="input"
-        />
-      )}
+      <input
+        value={branch}
+        onChange={(e) => setBranch(e.target.value)}
+        placeholder="branch (optional)"
+        className="input"
+      />
 
       <button
         type="submit"

@@ -273,6 +273,28 @@ describe("Boards", () => {
     const res = await request(app).get("/api/boards/nope").set(auth());
     expect(res.status).toBe(404);
   });
+
+  it("creates and lists standalone boards (no project)", async () => {
+    const created = await request(app)
+      .post("/api/boards")
+      .set(auth())
+      .send({ name: "Freehand UML" });
+    expect(created.status).toBe(201);
+    expect(created.body.name).toBe("Freehand UML");
+    expect(created.body.projectId).toBeNull();
+
+    const list = await request(app).get("/api/boards").set(auth());
+    expect(list.status).toBe(200);
+    expect(list.body.boards.some((b: { id: string }) => b.id === created.body.id)).toBe(true);
+
+    // Standalone boards must not leak into a project's board list.
+    const projectBoards = await request(app)
+      .get(`/api/projects/${projectId}/boards`)
+      .set(auth());
+    expect(
+      projectBoards.body.boards.some((b: { id: string }) => b.id === created.body.id),
+    ).toBe(false);
+  });
 });
 
 describe("GitHub import route", () => {

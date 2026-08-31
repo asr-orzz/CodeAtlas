@@ -54,7 +54,8 @@ export async function initSchema(db: Pool = getPool()): Promise<void> {
     CREATE TABLE IF NOT EXISTS boards (
       id         UUID PRIMARY KEY,
       user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      -- Nullable: a board can be standalone (hand-drawn UML) with no project.
+      project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
       name       TEXT NOT NULL,
       nodes      JSONB NOT NULL,
       edges      JSONB NOT NULL,

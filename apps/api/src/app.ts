@@ -67,6 +67,8 @@ export function createApp(
         "GET /api/projects/:id/graph/:view",
         "GET /api/projects/:id/boards",
         "POST /api/projects/:id/boards",
+        "GET /api/boards",
+        "POST /api/boards",
         "GET /api/boards/:boardId",
         "PUT /api/boards/:boardId",
         "DELETE /api/boards/:boardId",

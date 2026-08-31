@@ -120,7 +120,7 @@ export interface BoardEdge {
 
 export interface Board {
   id: string;
-  projectId: string;
+  projectId: string | null;
   name: string;
   nodes: BoardNode[];
   edges: BoardEdge[];
@@ -130,7 +130,7 @@ export interface Board {
 
 export interface BoardSummary {
   id: string;
-  projectId: string;
+  projectId: string | null;
   name: string;
   nodeCount: number;
   edgeCount: number;

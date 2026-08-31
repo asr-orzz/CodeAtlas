@@ -28,7 +28,8 @@ export interface BoardEdge {
 export interface Board {
   id: string;
   userId: string;
-  projectId: string;
+  /** Null for standalone, hand-drawn boards not tied to an analyzed project. */
+  projectId: string | null;
   name: string;
   nodes: BoardNode[];
   edges: BoardEdge[];
@@ -38,7 +39,7 @@ export interface Board {
 
 export interface BoardSummary {
   id: string;
-  projectId: string;
+  projectId: string | null;
   name: string;
   nodeCount: number;
   edgeCount: number;
@@ -51,12 +52,14 @@ export type BoardContent = Pick<Board, "nodes" | "edges"> & { name?: string };
 export interface BoardStore {
   create(
     userId: string,
-    projectId: string,
+    projectId: string | null,
     name: string,
     content?: BoardContent,
   ): Promise<Board>;
   get(userId: string, id: string): Promise<Board | undefined>;
   listByProject(userId: string, projectId: string): Promise<BoardSummary[]>;
+  /** Standalone boards (no project) owned by the user. */
+  listStandalone(userId: string): Promise<BoardSummary[]>;
   update(
     userId: string,
     id: string,
@@ -83,7 +86,7 @@ export class PgBoardStore implements BoardStore {
 
   async create(
     userId: string,
-    projectId: string,
+    projectId: string | null,
     name: string,
     content?: BoardContent,
   ): Promise<Board> {
@@ -136,6 +139,15 @@ export class PgBoardStore implements BoardStore {
     return rows.map((r) => summarize(this.fromRow(r)));
   }
 
+  async listStandalone(userId: string): Promise<BoardSummary[]> {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM boards WHERE user_id = $1 AND project_id IS NULL
+       ORDER BY updated_at DESC`,
+      [userId],
+    );
+    return rows.map((r) => summarize(this.fromRow(r)));
+  }
+
   async update(
     userId: string,
     id: string,
@@ -183,7 +195,7 @@ export class PgBoardStore implements BoardStore {
   private fromRow(row: {
     id: string;
     user_id: string;
-    project_id: string;
+    project_id: string | null;
     name: string;
     nodes: BoardNode[];
     edges: BoardEdge[];
@@ -209,7 +221,7 @@ export class MemoryBoardStore implements BoardStore {
 
   async create(
     userId: string,
-    projectId: string,
+    projectId: string | null,
     name: string,
     content?: BoardContent,
   ): Promise<Board> {
@@ -239,6 +251,13 @@ export class MemoryBoardStore implements BoardStore {
   ): Promise<BoardSummary[]> {
     return [...this.boards.values()]
       .filter((b) => b.userId === userId && b.projectId === projectId)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map(summarize);
+  }
+
+  async listStandalone(userId: string): Promise<BoardSummary[]> {
+    return [...this.boards.values()]
+      .filter((b) => b.userId === userId && b.projectId === null)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .map(summarize);
   }

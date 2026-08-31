@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { BoardView } from "../board/BoardView";
+import { StandaloneBoardView } from "../board/StandaloneBoardView";
 import { AiPanel } from "../components/AiPanel";
 import { AnalyzeForm } from "../components/AnalyzeForm";
 import { DetailPanel } from "../components/DetailPanel";
@@ -9,14 +10,21 @@ import { DiagramView, type DiagramRequest } from "../components/DiagramView";
 import { Wordmark } from "../components/Logo";
 import { ProjectList } from "../components/ProjectList";
 import { ReportPanel } from "../components/ReportPanel";
-import type { CanvasAction, ProjectDetail, ProjectSummary } from "../types";
+import type {
+  BoardSummary,
+  CanvasAction,
+  ProjectDetail,
+  ProjectSummary,
+} from "../types";
 
 type Mode = "explore" | "board";
 
 export function Dashboard() {
   const { user, logout } = useAuth();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ProjectDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -24,6 +32,7 @@ export function Dashboard() {
   const [mode, setMode] = useState<Mode>("explore");
   const [showAi, setShowAi] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [creatingBoard, setCreatingBoard] = useState(false);
   const [diagramRequest, setDiagramRequest] = useState<DiagramRequest | undefined>(undefined);
 
   const handleCanvasAction = useCallback((action: CanvasAction) => {
@@ -55,9 +64,45 @@ export function Dashboard() {
     }
   }, []);
 
+  const refreshBoards = useCallback(async () => {
+    try {
+      const { boards: list } = await api.listStandaloneBoards();
+      setBoards(list);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
   useEffect(() => {
     void refreshProjects();
-  }, [refreshProjects]);
+    void refreshBoards();
+  }, [refreshProjects, refreshBoards]);
+
+  const selectProject = useCallback((id: string) => {
+    setActiveBoardId(null);
+    setSelectedId(id);
+  }, []);
+
+  const openBoard = useCallback((id: string) => {
+    setSelectedId(null);
+    setDetail(null);
+    setActiveBoardId(id);
+  }, []);
+
+  const createBlankBoard = useCallback(async () => {
+    if (creatingBoard) return;
+    setCreatingBoard(true);
+    setError(null);
+    try {
+      const board = await api.createStandaloneBoard("Untitled board");
+      await refreshBoards();
+      openBoard(board.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCreatingBoard(false);
+    }
+  }, [creatingBoard, openBoard, refreshBoards]);
 
   useEffect(() => {
     setSelectedNodeId(null);
@@ -107,7 +152,7 @@ export function Dashboard() {
           <AnalyzeForm
             onAnalyzed={async (result) => {
               await refreshProjects();
-              setSelectedId(result.id);
+              selectProject(result.id);
             }}
           />
         </div>
@@ -115,9 +160,49 @@ export function Dashboard() {
           <ProjectList
             projects={projects}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={selectProject}
             onDelete={handleDelete}
           />
+
+          <div className="mt-5">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                My boards
+              </span>
+              <button
+                onClick={createBlankBoard}
+                disabled={creatingBoard}
+                className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
+              >
+                + New
+              </button>
+            </div>
+            {boards.length === 0 ? (
+              <p className="px-1 text-xs text-slate-600">
+                Create a blank board to draw UML by hand.
+              </p>
+            ) : (
+              <ul className="space-y-1">
+                {boards.map((b) => (
+                  <li key={b.id}>
+                    <button
+                      onClick={() => openBoard(b.id)}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${
+                        activeBoardId === b.id
+                          ? "bg-accent/20 text-accent-soft"
+                          : "text-slate-300 hover:bg-white/5"
+                      }`}
+                    >
+                      <span className="truncate">{b.name}</span>
+                      <span className="ml-2 shrink-0 text-[10px] text-slate-500">
+                        {b.nodeCount}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
         <UserMenu
           email={user?.email ?? ""}
@@ -135,8 +220,22 @@ export function Dashboard() {
           </div>
         )}
 
-        {!detail ? (
-          <EmptyState loading={loadingDetail} hasProjects={projects.length > 0} />
+        {activeBoardId ? (
+          <StandaloneBoardView
+            key={activeBoardId}
+            boardId={activeBoardId}
+            onDeleted={async () => {
+              setActiveBoardId(null);
+              await refreshBoards();
+            }}
+          />
+        ) : !detail ? (
+          <EmptyState
+            loading={loadingDetail}
+            hasProjects={projects.length > 0}
+            onCreateBoard={createBlankBoard}
+            creatingBoard={creatingBoard}
+          />
         ) : (
           <>
             <header className="flex items-center justify-between border-b border-white/5 px-6 py-4">
@@ -279,9 +378,13 @@ function UserMenu({
 function EmptyState({
   loading,
   hasProjects,
+  onCreateBoard,
+  creatingBoard,
 }: {
   loading: boolean;
   hasProjects: boolean;
+  onCreateBoard: () => void;
+  creatingBoard: boolean;
 }) {
   return (
     <div className="aurora flex flex-1 items-center justify-center p-8 text-center">
@@ -295,8 +398,17 @@ function EmptyState({
         <p className="text-slate-400">
           {hasProjects
             ? "Select a project on the left to see its architecture report, graphs and diagrams."
-            : "Analyze a GitHub repository or a local folder to build its fact-based architecture graph."}
+            : "Analyze a GitHub repository to build its fact-based architecture graph — or start a blank board and design UML by hand."}
         </p>
+        <div className="mt-6 flex items-center justify-center gap-3">
+          <button
+            onClick={onCreateBoard}
+            disabled={creatingBoard}
+            className="btn-primary"
+          >
+            {creatingBoard ? "Creating…" : "Create a blank board"}
+          </button>
+        </div>
       </div>
     </div>
   );
